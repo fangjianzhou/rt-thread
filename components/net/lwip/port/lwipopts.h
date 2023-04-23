@@ -47,6 +47,10 @@
 /* ---------- Basic Configuration ---------- */
 #define LWIP_IPV4                   1
 
+#ifdef RT_LWIP_SUPPORT_VLAN
+#define ETHARP_SUPPORT_VLAN            1
+#endif
+
 #ifdef RT_USING_LWIP_IPV6
 #define LWIP_IPV6                   1
 #else
@@ -346,7 +350,11 @@
 
 /* PBUF_LINK_HLEN: the number of bytes that should be allocated for a
    link level header. */
+#ifdef ETHARP_SUPPORT_VLAN
+#define PBUF_LINK_HLEN              20
+#else
 #define PBUF_LINK_HLEN              16
+#endif
 
 #ifdef RT_LWIP_ETH_PAD_SIZE
 #define ETH_PAD_SIZE                RT_LWIP_ETH_PAD_SIZE

@@ -592,8 +592,18 @@ rt_err_t eth_device_init_with_flag(struct eth_device *dev, const char *name, rt_
     netif->linkoutput   = ethernetif_linkoutput;
 
     /* get hardware MAC address */
-    rt_device_control(&(dev->parent), NIOCTL_GADDR, netif->hwaddr);
+#if ETHARP_SUPPORT_VLAN
+    if (dev->phy_node)
+    {
+        rt_device_control(&(dev->phy_node->parent), NIOCTL_GADDR, netif->hwaddr);
+    }
+    else
+#endif
+    {
+        rt_device_control(&(dev->parent), NIOCTL_GADDR, netif->hwaddr);
+    }
 
+    rt_list_init(&dev->list);
 #if LWIP_NETIF_HOSTNAME
     /* Initialize interface hostname */
     hostname = (char *)netif + sizeof(struct netif);
@@ -654,6 +664,136 @@ void eth_device_deinit(struct eth_device *dev)
     rt_device_unregister(&(dev->parent));
     rt_free(netif);
 }
+
+#if ETHARP_SUPPORT_VLAN
+static rt_err_t rt_virtual_eth_init(rt_device_t dev)
+{
+    return RT_EOK;
+}
+
+static rt_err_t rt_virtual_eth_open(rt_device_t dev, rt_uint16_t oflag)
+{
+    return RT_EOK;
+}
+
+static rt_err_t rt_virtual_eth_close(rt_device_t dev)
+{
+    return RT_EOK;
+}
+
+static rt_ssize_t rt_virtual_eth_read(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size)
+{
+    rt_set_errno(-RT_ENOSYS);
+    return 0;
+}
+
+static rt_ssize_t rt_virtual_eth_write(rt_device_t dev, rt_off_t pos, const void *buffer, rt_size_t size)
+{
+    rt_set_errno(-RT_ENOSYS);
+    return RT_EOK;
+}
+
+static rt_err_t rt_virtual_eth_control(rt_device_t dev, int cmd, void *args)
+{
+    return RT_EOK;
+}
+
+struct pbuf *rt_virtual_eth_rx(rt_device_t dev)
+{
+    struct eth_device *eth_device = (struct eth_device *)dev;
+
+    return eth_device->phy_node->eth_rx((rt_device_t)eth_device->phy_node);
+}
+
+/* transmit data*/
+rt_err_t rt_virtual_eth_tx(rt_device_t dev, struct pbuf *p)
+{
+    struct eth_device *eth_device = (struct eth_device *)dev;
+
+    eth_device->phy_node->eth_tx((rt_device_t)eth_device->phy_node, p);
+    return 0;
+}
+
+#ifdef RT_USING_DEVICE_OPS
+struct rt_device_ops _virtual_enet_ops =
+{
+        rt_virtual_eth_init,
+        rt_virtual_eth_open,
+        rt_virtual_eth_close,
+        rt_virtual_eth_read,
+        rt_virtual_eth_write,
+        rt_virtual_eth_control,
+};
+#endif
+
+struct eth_device * virtual_eth_device_create(char *eth_name, rt_uint16_t prio_vid, const char *name)
+{
+    struct eth_device *phy_dev;
+    struct eth_device *dev;
+
+    phy_dev = (struct eth_device *)rt_device_find(eth_name);
+    if (phy_dev == RT_NULL)
+    {
+        rt_kprintf("The %s device is not found. Procedure\n", eth_name);
+        return RT_NULL;
+    }
+
+    dev = (struct eth_device *)rt_calloc(1, sizeof(struct eth_device));
+    if (dev == RT_NULL)
+    {
+        rt_kprintf("calloc memory failed.\n");
+        return RT_NULL;
+    }
+
+    rt_memset(dev, 0, sizeof(struct eth_device));
+    dev->phy_node = phy_dev;
+
+#ifdef RT_USING_DEVICE_OPS
+    dev->parent.ops = &_virtual_enet_ops;
+#else
+    dev->parent.init = rt_virtual_eth_init;
+    dev->parent.open = rt_virtual_eth_open;
+    dev->parent.close = rt_virtual_eth_close;
+    dev->parent.read = rt_virtual_eth_read;
+    dev->parent.write = rt_virtual_eth_write;
+    dev->parent.control = rt_virtual_eth_control;
+#endif
+    dev->eth_rx = rt_virtual_eth_rx;
+    dev->eth_tx = rt_virtual_eth_tx;
+
+    if (eth_device_init(dev, name) != RT_EOK)
+    {
+        rt_free(dev);
+        return RT_NULL;
+    }
+
+    dev->netif->prio_vid = prio_vid;
+
+    // TODO
+    rt_list_insert_after(&phy_dev->list, &dev->list);
+
+    return dev;
+}
+
+rt_err_t virtual_eth_device_delete(char *eth_name)
+{
+    struct eth_device *dev;
+
+    dev = (struct eth_device *)rt_device_find(eth_name);
+    if (dev)
+    {
+        if (dev->phy_node != NULL)
+        {
+            // TODO
+            rt_list_remove(&dev->list);
+        }
+
+        eth_device_deinit(dev);
+    }
+
+    return RT_EOK;
+}
+#endif
 
 #ifdef SAL_USING_AF_UNIX /* create loopback netdev */
 static err_t af_unix_eth_netif_device_init(struct netif *netif)
@@ -923,6 +1063,29 @@ static void eth_rx_thread_entry(void* parameter)
                     netifapi_netif_set_link_up(device->netif);
                 else
                     netifapi_netif_set_link_down(device->netif);
+
+#if ETHARP_SUPPORT_VLAN
+                if (device->phy_node == NULL)
+                {
+                    /* Set the virtual network card status */
+                    rt_list_t *node = RT_NULL;
+                    struct eth_device* dev;
+
+                    rt_list_for_each(node, &(device->list))
+                    {
+                        dev = rt_list_entry(node, struct eth_device, list);
+
+                        if (status)
+                        {
+                            netifapi_netif_set_link_up(dev->netif);
+                        }
+                        else
+                        {
+                            netifapi_netif_set_link_down(dev->netif);
+                        }
+                    }
+                }
+#endif
             }
 
             level = rt_spin_lock_irqsave(&(device->spinlock));

@@ -51,6 +51,12 @@ if RT_USING_LWIP
             select NETDEV_IPV6_SCOPES if RT_USING_LWIP212
     endif
 
+    if (RT_USING_LWIP_VER_NUM >= 0x20102)
+        config RT_LWIP_SUPPORT_VLAN
+            bool "VLAN Support"
+            default n
+    endif
+
     config RT_LWIP_MEM_ALIGNMENT
         int "Memory alignment"
         default 8 if ARCH_CPU_64BIT

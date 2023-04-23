@@ -271,6 +271,13 @@ struct netif {
   ip_addr_t netmask;
   ip_addr_t gw;
 #endif /* LWIP_IPV4 */
+
+/* [LWIPSECA_SWREQ_0802] */
+#ifdef ETHARP_SUPPORT_VLAN
+/* [LWIPSECA_SWREQ_0783] */
+  u16_t prio_vid;
+#endif/* RT_LWIP_SUPPORT_VLAN */
+
 #if LWIP_IPV6
   /** Array of IPv6 addresses for this netif. */
   ip_addr_t ip6_addr[LWIP_IPV6_NUM_ADDRESSES];

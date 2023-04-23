@@ -111,6 +111,9 @@ ethernet_input(struct pbuf *p, struct netif *netif)
                lwip_htons(ethhdr->type)));
 
   type = ethhdr->type;
+  /* [LWIPSECA_SWREQ_0777] */
+  /* [LWIPSECA_SWREQ_0802] */
+  /* [LWIPSECA_SWREQ_0792] */
 #if ETHARP_SUPPORT_VLAN
   if (type == PP_HTONS(ETHTYPE_VLAN)) {
     struct eth_vlan_hdr *vlan = (struct eth_vlan_hdr *)(((char *)ethhdr) + SIZEOF_ETH_HDR);
@@ -122,20 +125,23 @@ ethernet_input(struct pbuf *p, struct netif *netif)
       MIB2_STATS_NETIF_INC(netif, ifinerrors);
       goto free_and_return;
     }
-#if defined(LWIP_HOOK_VLAN_CHECK) || defined(ETHARP_VLAN_CHECK) || defined(ETHARP_VLAN_CHECK_FN) /* if not, allow all VLANs */
-#ifdef LWIP_HOOK_VLAN_CHECK
-    if (!LWIP_HOOK_VLAN_CHECK(netif, ethhdr, vlan)) {
-#elif defined(ETHARP_VLAN_CHECK_FN)
-    if (!ETHARP_VLAN_CHECK_FN(ethhdr, vlan)) {
-#elif defined(ETHARP_VLAN_CHECK)
-    if (VLAN_ID(vlan) != ETHARP_VLAN_CHECK) {
-#endif
-      /* silently ignore this packet: not for our VLAN */
-      pbuf_free(p);
-      return ERR_OK;
-    }
-#endif /* defined(LWIP_HOOK_VLAN_CHECK) || defined(ETHARP_VLAN_CHECK) || defined(ETHARP_VLAN_CHECK_FN) */
+
     type = vlan->tpid;
+    /* [LWIPSECA_SWREQ_0798] */
+    /* [LWIPSECA_SWREQ_0799] */
+    //TODO mutex ???
+    for (netif = netif_list; netif != NULL; netif = netif->next) {
+      if (netif->prio_vid == PP_HTONS(vlan->prio_vid)) {
+        break;
+      }
+    }
+    if (netif == NULL) {
+      goto free_and_return;
+    }
+
+    if (p->if_idx == NETIF_NO_INDEX) {
+      p->if_idx = netif_get_index(netif);
+    }
   }
 #endif /* ETHARP_SUPPORT_VLAN */
 
@@ -273,23 +279,39 @@ ethernet_output(struct netif * netif, struct pbuf * p,
   struct eth_hdr *ethhdr;
   u16_t eth_type_be = lwip_htons(eth_type);
 
-#if ETHARP_SUPPORT_VLAN && defined(LWIP_HOOK_VLAN_SET)
-  s32_t vlan_prio_vid = LWIP_HOOK_VLAN_SET(netif, p, src, dst, eth_type);
-  if (vlan_prio_vid >= 0) {
-    struct eth_vlan_hdr *vlanhdr;
+  /* [LWIPSECA_SWREQ_0806] */
+  /* [LWIPSECA_SWREQ_0807] */
+  /* [LWIPSECA_SWREQ_0808] */
+#ifndef RT_DEFAULT_NETIF_SEND
+  if (netif_default == netif) {
+    goto pbuf_header_failed;
+  }
+#endif
 
-    LWIP_ASSERT("prio_vid must be <= 0xFFFF", vlan_prio_vid <= 0xFFFF);
+  /* [LWIPSECA_SWREQ_0777] */
+  /* [LWIPSECA_SWREQ_0802] */
+  /* [LWIPSECA_SWREQ_0812] */
+  /* [LWIPSECA_SWREQ_0813] */
+#if ETHARP_SUPPORT_VLAN
+  if (netif->prio_vid > 0)
+  {
+    s32_t vlan_prio_vid = netif->prio_vid;
 
-    if (pbuf_add_header(p, SIZEOF_ETH_HDR + SIZEOF_VLAN_HDR) != 0) {
-      goto pbuf_header_failed;
+    if (vlan_prio_vid >= 0) {
+      struct eth_vlan_hdr *vlanhdr;
+
+      LWIP_ASSERT("prio_vid must be <= 0xFFFF", vlan_prio_vid <= 0xFFFF);
+
+      if (pbuf_add_header(p, SIZEOF_ETH_HDR + SIZEOF_VLAN_HDR) != 0) {
+        goto pbuf_header_failed;
+      }
+      vlanhdr = (struct eth_vlan_hdr *)(((u8_t *)p->payload) + SIZEOF_ETH_HDR);
+      vlanhdr->tpid     = eth_type_be;
+      vlanhdr->prio_vid = lwip_htons((u16_t)vlan_prio_vid);
+      eth_type_be = PP_HTONS(ETHTYPE_VLAN);
     }
-    vlanhdr = (struct eth_vlan_hdr *)(((u8_t *)p->payload) + SIZEOF_ETH_HDR);
-    vlanhdr->tpid     = eth_type_be;
-    vlanhdr->prio_vid = lwip_htons((u16_t)vlan_prio_vid);
-
-    eth_type_be = PP_HTONS(ETHTYPE_VLAN);
-  } else
-#endif /* ETHARP_SUPPORT_VLAN && defined(LWIP_HOOK_VLAN_SET) */
+  }else
+#endif /* RT_LWIP_SUPPORT_VLAN */
   {
     if (pbuf_add_header(p, SIZEOF_ETH_HDR) != 0) {
       goto pbuf_header_failed;

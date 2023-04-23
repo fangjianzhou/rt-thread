@@ -29,6 +29,15 @@ extern "C" {
 #define ETHIF_LINK_AUTOUP   0x0000
 #define ETHIF_LINK_PHYUP    0x0100
 
+struct rt_vlan_ip_cfg
+{
+  char *name;
+  char *ip_addr;
+  char *netmask;
+  char *gw;
+  rt_uint16_t prio_vid;
+};
+
 struct eth_device
 {
     /* inherit from rt_device */
@@ -47,6 +56,11 @@ struct eth_device
     /* eth device interface */
     struct pbuf* (*eth_rx)(rt_device_t dev);
     rt_err_t (*eth_tx)(rt_device_t dev, struct pbuf* p);
+
+#if ETHARP_SUPPORT_VLAN
+    struct eth_device *phy_node;
+#endif
+    rt_list_t  list;
 };
 
 int eth_system_device_init(void);
@@ -56,6 +70,8 @@ rt_err_t eth_device_init(struct eth_device * dev, const char *name);
 rt_err_t eth_device_init_with_flag(struct eth_device *dev, const char *name, rt_uint16_t flag);
 rt_err_t eth_device_linkchange(struct eth_device* dev, rt_bool_t up);
 
+struct eth_device *virtual_eth_device_create(char *eth_name, rt_uint16_t prio_vid, const char *name);
+rt_err_t virtual_eth_device_delete(char *eth_name);
 #ifdef __cplusplus
 }
 #endif

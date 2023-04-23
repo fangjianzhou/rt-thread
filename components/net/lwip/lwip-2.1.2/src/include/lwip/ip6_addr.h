@@ -341,8 +341,6 @@ int ip6addr_aton(const char *cp, ip6_addr_t *addr);
 char *ip6addr_ntoa(const ip6_addr_t *addr);
 char *ip6addr_ntoa_r(const ip6_addr_t *addr, char *buf, int buflen);
 
-
-
 #ifdef __cplusplus
 }
 #endif

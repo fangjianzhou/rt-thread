@@ -603,6 +603,7 @@ int dfs_file_stat(const char *path, struct stat *buf)
         result = fs->ops->stat(fs, subdir, buf);
     }
 
+
     rt_free(fullpath);
 
     return result;

@@ -279,15 +279,6 @@ ethernet_output(struct netif * netif, struct pbuf * p,
   struct eth_hdr *ethhdr;
   u16_t eth_type_be = lwip_htons(eth_type);
 
-  /* [LWIPSECA_SWREQ_0806] */
-  /* [LWIPSECA_SWREQ_0807] */
-  /* [LWIPSECA_SWREQ_0808] */
-#ifndef RT_DEFAULT_NETIF_SEND
-  if (netif_default == netif) {
-    goto pbuf_header_failed;
-  }
-#endif
-
   /* [LWIPSECA_SWREQ_0777] */
   /* [LWIPSECA_SWREQ_0802] */
   /* [LWIPSECA_SWREQ_0812] */

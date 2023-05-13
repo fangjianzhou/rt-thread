@@ -70,8 +70,11 @@ rt_err_t eth_device_init(struct eth_device * dev, const char *name);
 rt_err_t eth_device_init_with_flag(struct eth_device *dev, const char *name, rt_uint16_t flag);
 rt_err_t eth_device_linkchange(struct eth_device* dev, rt_bool_t up);
 
+#if ETHARP_SUPPORT_VLAN
 struct eth_device *virtual_eth_device_create(char *eth_name, rt_uint16_t prio_vid, const char *name);
 rt_err_t virtual_eth_device_delete(char *eth_name);
+rt_bool_t virtual_eth_id_is_exists(rt_uint16_t prio_vid);
+#endif
 #ifdef __cplusplus
 }
 #endif

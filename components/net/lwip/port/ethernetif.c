@@ -119,6 +119,10 @@ static char eth_rx_thread_stack[RT_LWIP_ETHTHREAD_STACKSIZE];
 #endif
 #endif
 
+#if ETHARP_SUPPORT_VLAN
+static struct rt_mutex vlan_mutex;
+#endif
+
 #ifdef RT_USING_NETDEV
 
 #include "lwip/ip.h"
@@ -769,8 +773,9 @@ struct eth_device * virtual_eth_device_create(char *eth_name, rt_uint16_t prio_v
 
     dev->netif->prio_vid = prio_vid;
 
-    // TODO
+    rt_mutex_take(&vlan_mutex, RT_WAITING_FOREVER);
     rt_list_insert_after(&phy_dev->list, &dev->list);
+    rt_mutex_release(&vlan_mutex);
 
     return dev;
 }
@@ -784,14 +789,41 @@ rt_err_t virtual_eth_device_delete(char *eth_name)
     {
         if (dev->phy_node != NULL)
         {
-            // TODO
+            rt_mutex_take(&vlan_mutex, RT_WAITING_FOREVER);
             rt_list_remove(&dev->list);
+            rt_mutex_release(&vlan_mutex);
         }
 
         eth_device_deinit(dev);
     }
 
     return RT_EOK;
+}
+
+rt_bool_t virtual_eth_id_is_exists(rt_uint16_t prio_vid)
+{
+    struct netif * netif;
+    struct eth_device *dev;
+
+    rt_enter_critical();
+
+    netif = netif_list;
+
+    while(netif != RT_NULL)
+    {
+        dev = (struct eth_device*)netif->state;
+        if (dev && (dev->netif->prio_vid == prio_vid))
+        {
+            rt_exit_critical();
+            return RT_TRUE;
+        }
+
+        netif = netif->next;
+    }
+
+    rt_exit_critical();
+
+    return RT_FALSE;
 }
 #endif
 
@@ -1071,6 +1103,7 @@ static void eth_rx_thread_entry(void* parameter)
                     rt_list_t *node = RT_NULL;
                     struct eth_device* dev;
 
+                    rt_mutex_take(&vlan_mutex, RT_WAITING_FOREVER);
                     rt_list_for_each(node, &(device->list))
                     {
                         dev = rt_list_entry(node, struct eth_device, list);
@@ -1084,6 +1117,7 @@ static void eth_rx_thread_entry(void* parameter)
                             netifapi_netif_set_link_down(dev->netif);
                         }
                     }
+                    rt_mutex_release(&vlan_mutex);
                 }
 #endif
             }
@@ -1166,6 +1200,11 @@ int eth_system_device_init_private(void)
     RT_ASSERT(result == RT_EOK);
 #endif
 
+    /* initialize vlan mutex */
+#if ETHARP_SUPPORT_VLAN
+    rt_mutex_init(&vlan_mutex, "vlan", RT_IPC_FLAG_FIFO);
+#endif
+
     return (int)result;
 }
 
@@ -1242,6 +1281,176 @@ void set_dns(uint8_t dns_num, char* dns_server)
     }
 }
 FINSH_FUNCTION_EXPORT(set_dns, set DNS server address);
+#endif
+
+#if ETHARP_SUPPORT_VLAN
+#define VLAN_ID_MIN 0
+#define VLAN_ID_MAX 4095
+#define VLAN_ID_IS_VALID(netif) ((netif)&&((netif)->prio_vid > VLAN_ID_MIN)&&((netif)->prio_vid < VLAN_ID_MAX))
+static int list_vlan(void)
+{
+    struct netif * netif = RT_NULL;
+    struct eth_device *dev = RT_NULL;
+
+    rt_kprintf("vlan_name vlan_id ip_addr         netmask         gw              phy_eth\n");
+    rt_kprintf("--------  ------- --------------- --------------- --------------- -------\n");
+
+    rt_enter_critical();
+
+    netif = netif_list;
+
+    while(netif != RT_NULL)
+    {
+        if (netif && VLAN_ID_IS_VALID(netif))
+        {
+            rt_kprintf("%-8.8s   %-7d ", netif->name, netif->prio_vid);
+            rt_kprintf("%-15s ", ipaddr_ntoa(&(netif->ip_addr)));
+            rt_kprintf("%-15s ", ipaddr_ntoa(&(netif->gw)));
+            rt_kprintf("%-15s ", ipaddr_ntoa(&(netif->netmask)));
+
+            dev = (struct eth_device*)netif->state;
+            if (dev && dev->phy_node)
+            {
+                rt_kprintf("%-8.8s\n", dev->phy_node->netif->name);
+            }
+            else
+            {
+                rt_kprintf("%-8.8s\n", "(NULL)");
+            }
+        }
+
+        netif = netif->next;
+    }
+
+    rt_exit_critical();
+    return 0;
+}
+
+static int vconfig(int argc, char *argv[])
+{
+    if (argc == 2)
+    {
+        if (strcmp(argv[1], "list") == 0)
+        {
+            list_vlan();
+            return 0;
+        }
+    }
+    else if (argc == 3)
+    {
+        if (strcmp(argv[1], "rem") == 0)
+        {
+            struct eth_device *vlan_dev = RT_NULL;
+
+            vlan_dev = (struct eth_device *)rt_device_find(argv[2]);
+            if(vlan_dev)
+            {
+                if (VLAN_ID_IS_VALID(vlan_dev->netif))
+                {
+                    virtual_eth_device_delete(argv[2]);
+                }
+                else
+                {
+                    rt_kprintf("The \"%s\" is not a vlan device.\n", argv[2]);
+                }
+            }
+            else
+            {
+                rt_kprintf("Cannot find device \"%s\".\n", argv[2]);
+            }
+            return 0;
+        }
+    }
+    else if (argc > 4)
+    {
+        if (strcmp(argv[1], "add") == 0)
+        {
+            struct ip4_addr ipaddr, netmask, gw;
+            struct eth_device *vlan_dev = RT_NULL;
+            struct eth_device *eth_dev = RT_NULL;
+            rt_uint16_t vlan_id;
+            char eth_name[RT_NAME_MAX];
+            char *vlan_name = RT_NULL;
+
+            vlan_name = argv[3];
+            vlan_id = atoi(argv[4]);
+
+            /* Check if the physical network card is a virtual network card */
+            eth_dev = (struct eth_device *)rt_device_find(argv[2]);
+            if (eth_dev && VLAN_ID_IS_VALID(eth_dev->netif))
+            {
+                rt_snprintf(eth_name,
+                            rt_strlen(eth_dev->phy_node->netif->name) < RT_NAME_MAX ? rt_strlen(eth_dev->phy_node->netif->name) : RT_NAME_MAX,
+                            "%s\n", eth_dev->phy_node->netif->name);
+            }
+            else
+            {
+                rt_snprintf(eth_name, RT_NAME_MAX, "%s", argv[2]);
+            }
+
+            /* Check if the virtual network card exists */
+            vlan_dev = (struct eth_device *)rt_device_find(vlan_name);
+            if (vlan_dev)
+            {
+                rt_kprintf("The vlan device \"%s\" already exists.\n", vlan_name);
+                return 0;
+            }
+
+            /* Check if the vlan ID is valid */
+            if (vlan_id <= VLAN_ID_MIN || vlan_id >= VLAN_ID_MAX)
+            {
+                rt_kprintf("Invalid vlan id. The value range should be (0-4095)\n");
+                return 0;
+            }
+
+            /* Check if the vlan ID exists */
+            if (virtual_eth_id_is_exists(vlan_id))
+            {
+                rt_kprintf("The vlan id %d already exists.\n", vlan_id);
+                return 0;
+            }
+
+            /* Create a virtual network card */
+            vlan_dev = virtual_eth_device_create(eth_name, vlan_id, vlan_name);
+            if (vlan_dev == RT_NULL)
+            {
+                rt_kprintf("Add \"%s\" vlan device failed.\n", vlan_name);
+                return 0;
+            }
+
+            /* Configure network */
+            if (argc > 7)
+            {
+                ipaddr.addr = inet_addr(argv[5]);
+                gw.addr = inet_addr(argv[6]);
+                netmask.addr = inet_addr(argv[7]);
+                netifapi_netif_set_addr(vlan_dev->netif, &ipaddr, &netmask, &gw);
+            }
+
+            /* Enable virtual network card based on physical network card status */
+            if (netdev_is_link_up(vlan_dev->phy_node->netif))
+            {
+                eth_device_linkchange(vlan_dev, RT_TRUE);
+            }
+
+            rt_kprintf("vlan name: %s\n", vlan_dev->netif->name);
+            rt_kprintf("ip addr  : %s\n", argv[5]);
+            rt_kprintf("gateway  : %s\n", argv[6]);
+            rt_kprintf("netmask  : %s\n", argv[7]);
+            return 0;
+        }
+    }
+
+    rt_kprintf("Usage: list\n");
+    rt_kprintf("       add [phy_eth] [vlan_name] [vlan_id] [addr] [gateway] [netmask]\n");
+    rt_kprintf("       rem [vlan_name]\n");
+    rt_kprintf("\n");
+    rt_kprintf("* The [phy_eth] is the name of the ethernet card that hosts.\n");
+    rt_kprintf("* The [vlan_name] should not exceed 2 characters, eg: v1\n");
+    rt_kprintf("* The [vlan_id] is the identifier (0-4095) of the VLAN you are operating on.\n");
+    return 0;
+}
+MSH_CMD_EXPORT(vconfig, vlan config);
 #endif
 
 void list_if(void)

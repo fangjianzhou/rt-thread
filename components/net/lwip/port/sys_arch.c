@@ -695,10 +695,15 @@ void mem_overflow_init_raw(void *p, size_t size)
 struct netif *lwip_ip4_route_src(const ip4_addr_t *dest, const ip4_addr_t *src)
 {
     struct netif *netif;
-
+/* [LWIPROUTE_ROUTE_0515] */
+#ifdef LWIP_HOOK_IP4_ROUTE
+    netif = LWIP_HOOK_IP4_ROUTE(dest);
+    if (netif != NULL) {
+        return netif;
+    }
+#endif
     if (src == NULL)
         return NULL;
-
     /* iterate through netifs */
     for (netif = netif_list; netif != NULL; netif = netif->next)
     {

@@ -10,6 +10,7 @@ src/core/def.c
 src/core/dns.c
 src/core/inet_chksum.c
 src/core/ip.c
+src/core/ip_route.c
 src/core/memp.c
 src/core/netif.c
 src/core/pbuf.c
@@ -226,6 +227,11 @@ lwipping_SRCS = Split("""
 src/apps/ping/ping.c
 """)
 
+# 18. route
+lwiproute_SRCS = Split("""
+src/apps/route/route.c
+""")
+
 src = []
 src += lwipcore_SRCS
 src += lwipcore_altcp_SRCS
@@ -234,6 +240,7 @@ src += lwipnetif_SRCS
 src += lwipsixlowpan_SRCS
 
 src += lwipcore4_SRCS
+src += lwiproute_SRCS
 
 path = [cwd + '/src/include',
     cwd + '/src/include/netif']

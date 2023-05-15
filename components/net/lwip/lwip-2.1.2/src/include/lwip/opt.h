@@ -2878,6 +2878,17 @@
 #endif
 
 /**
+ * IP Route 
+ * Enable support for routing table functionality
+ */
+/* [LWIPROUTE_ROUTE_0515] */
+#define LWIP_ROUTE                   1      
+#if LWIP_ROUTE
+#define LWIP_HOOK_IP4_ROUTE(a)                        route_ip4_find((ip4_addr_t *)a)
+#define LWIP_HOOK_IP6_ROUTE(IP6_ADDR_ANV6, a)         route_ip6_find((ip6_addr_t *)a)
+#endif
+
+/**
  * LWIP_HOOK_IP4_ROUTE_SRC(src, dest):
  * Source-based routing for IPv4 - called from ip_route() (IPv4)
  * Signature:\code{.c}

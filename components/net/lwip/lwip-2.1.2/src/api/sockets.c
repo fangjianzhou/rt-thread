@@ -1172,7 +1172,8 @@ lwip_recv_tcp(struct lwip_sock *sock, struct msghdr *message, void *mem, size_t 
     recv_left -= copylen;
 
 #ifdef LWIP_TIMESTAMPS
-    if (message && flags == 0 && p) {
+    if (message && p &&
+      (lwip_sock_test_flag(sock, SOCK_RCVTSTAMP) || lwip_sock_test_flag(sock, SOCK_RCVTSTAMPNS))) {
       int status = cmsg_has_timestamping_storage(sock, message);
 
       if (!status) {
@@ -1373,7 +1374,8 @@ lwip_recvfrom_udp_raw(struct lwip_sock *sock, int flags, struct msghdr *msg, u16
     }
 #endif /* LWIP_NETBUF_RECVINFO */
 #ifdef LWIP_TIMESTAMPS
-    if (flags == 0 && !msg->msg_flags) {
+    if (!msg->msg_flags &&
+      (lwip_sock_test_flag(sock, SOCK_RCVTSTAMP) || lwip_sock_test_flag(sock, SOCK_RCVTSTAMPNS))) {
       int status = cmsg_has_timestamping_storage(sock, msg);
 
       if (!status) {

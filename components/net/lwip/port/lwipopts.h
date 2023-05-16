@@ -93,8 +93,6 @@
 #ifdef RT_LWIP_USING_TIMESTAMPS
 #define LWIP_TIMESTAMPS             1
 #define LWIP_TIMESTAMPS_QSIZE       RT_LWIP_USING_TIMESTAMPS_QSIZE
-#else
-#define LWIP_TIMESTAMPS             0
 #endif
 
 /* #define RT_LWIP_DEBUG */

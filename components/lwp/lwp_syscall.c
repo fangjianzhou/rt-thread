@@ -196,6 +196,18 @@ void lwp_cleanup(struct rt_thread *tid);
                 case INTF_SO_NO_CHECK:
                     *optname = IMPL_SO_NO_CHECK;
                     break;
+                case INTF_SO_BINDTODEVICE:
+                    *optname = IMPL_SO_BINDTODEVICE;
+                    break;
+                case INTF_SO_TIMESTAMPNS:
+                    *optname = IMPL_SO_TIMESTAMPNS;
+                    break;
+                case INTF_SO_TIMESTAMPING:
+                    *optname = IMPL_SO_TIMESTAMPING;
+                    break;
+                case INTF_SO_SELECT_ERR_QUEUE:
+                    *optname = IMPL_SO_SELECT_ERR_QUEUE;
+                    break;
 
                 /*
                 * SO_DONTLINGER (*level = ((int)(~SO_LINGER))),
@@ -3550,21 +3562,28 @@ static int netflags_muslc_2_lwip(int flags)
     {
         flgs |= MSG_MORE;
     }
+    if (flags & MSG_ERRQUEUE)
+    {
+        flgs |= MSG_ERRQUEUE;
+    }
     return flgs;
 }
 
 #ifdef ARCH_MM_MMU
-static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg, struct iovec **out_iov)
+static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg,
+        struct iovec **out_iov, void **out_msg_control)
 {
     size_t iovs_size;
     struct iovec *uiov, *kiov;
     size_t iovs_buffer_size = 0;
     void *iovs_buffer;
 
-    if (lwp_get_from_user(kmsg, umsg, sizeof(*kmsg)))
+    if (!lwp_user_accessable(umsg, sizeof(*umsg)))
     {
         return -EFAULT;
     }
+
+    lwp_get_from_user(kmsg, umsg, sizeof(*kmsg));
 
     iovs_size = sizeof(*kmsg->msg_iov) * kmsg->msg_iovlen;
     if (!lwp_user_accessable(kmsg->msg_iov, iovs_size))
@@ -3608,7 +3627,8 @@ static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg, struc
         ++uiov;
     }
 
-    iovs_buffer = kmem_get(iovs_buffer_size);
+    /* msg_iov and msg_control */
+    iovs_buffer = kmem_get(iovs_buffer_size + kmsg->msg_controllen);
 
     if (!iovs_buffer)
     {
@@ -3626,6 +3646,10 @@ static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg, struc
         ++kiov;
     }
 
+    *out_msg_control = kmsg->msg_control;
+    /* msg_control is the end of the iovs_buffer */
+    kmsg->msg_control = iovs_buffer;
+
     return 0;
 }
 #endif /* ARCH_MM_MMU */
@@ -3634,6 +3658,10 @@ sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
 {
     int flgs, ret = -1;
     struct msghdr kmsg;
+#ifdef ARCH_MM_MMU
+    void *msg_control;
+    struct iovec *uiov, *kiov;
+#endif
 
     if (!msg)
     {
@@ -3643,16 +3671,23 @@ sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
     flgs = netflags_muslc_2_lwip(flags);
 
 #ifdef ARCH_MM_MMU
-    ret = copy_msghdr_from_user(&kmsg, (struct msghdr *)msg, RT_NULL);
+    ret = copy_msghdr_from_user(&kmsg, (struct msghdr *)msg, &uiov, &msg_control);
 
     if (!ret)
     {
-        ret = sendmsg(socket, &kmsg, flgs);
+        kiov = kmsg.msg_iov;
 
-        if (ret)
+        for (int i = 0; i < kmsg.msg_iovlen; ++i)
         {
-            return ret;
+            lwp_get_from_user(kiov->iov_base, uiov->iov_base, kiov->iov_len);
+
+            ++kiov;
+            ++uiov;
         }
+
+        lwp_get_from_user(kmsg.msg_control, msg_control, kmsg.msg_controllen);
+
+        ret = sendmsg(socket, &kmsg, flgs);
 
         kmem_put(kmsg.msg_iov->iov_base);
         kmem_put(kmsg.msg_iov);
@@ -3660,7 +3695,7 @@ sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
 #else
     rt_memcpy(&kmsg, msg, sizeof(kmsg));
 
-    ret = recvmsg(socket, &kmsg, flgs);
+    ret = sendmsg(socket, &kmsg, flgs);
 
     if (!ret)
     {
@@ -3675,7 +3710,10 @@ sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
 {
     int flgs, ret = -1;
     struct msghdr kmsg;
+#ifdef ARCH_MM_MMU
+    void *msg_control;
     struct iovec *uiov, *kiov;
+#endif
 
     if (!msg)
     {
@@ -3685,29 +3723,31 @@ sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
     flgs = netflags_muslc_2_lwip(flags);
 
 #ifdef ARCH_MM_MMU
-    ret = copy_msghdr_from_user(&kmsg, msg, &uiov);
+    ret = copy_msghdr_from_user(&kmsg, msg, &uiov, &msg_control);
 
     if (!ret)
     {
         ret = recvmsg(socket, &kmsg, flgs);
 
-        if (ret)
+        if (ret < 0)
         {
-            return ret;
+            goto _free_res;
         }
 
         kiov = kmsg.msg_iov;
 
         for (int i = 0; i < kmsg.msg_iovlen; ++i)
         {
-            lwp_put_to_user(kiov->iov_base, uiov->iov_base, uiov->iov_len);
+            lwp_put_to_user(uiov->iov_base, kiov->iov_base, kiov->iov_len);
 
             ++kiov;
             ++uiov;
         }
 
+        lwp_put_to_user(msg_control, kmsg.msg_control, kmsg.msg_controllen);
         lwp_put_to_user(&msg->msg_flags, &kmsg.msg_flags, sizeof(kmsg.msg_flags));
 
+    _free_res:
         kmem_put(kmsg.msg_iov->iov_base);
         kmem_put(kmsg.msg_iov);
     }

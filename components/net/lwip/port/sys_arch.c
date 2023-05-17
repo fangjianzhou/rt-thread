@@ -25,6 +25,7 @@
 #include <lwip/sys.h>
 #include <lwip/opt.h>
 #include <lwip/stats.h>
+#include <lwip/ip_route.h>
 #include <lwip/err.h>
 #include <lwip/debug.h>
 #include <lwip/netif.h>

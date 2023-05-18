@@ -2,17 +2,7 @@
 #include <lwip/opt.h>
 
 #ifdef LWIP_ROUTE    /* don't build if not configured for use in rtconfig.h */
-#include <lwip/init.h>
-#include <lwip/mem.h>
-#include <lwip/icmp.h>
-#include <lwip/netif.h>
-#include <lwip/sys.h>
-#include <lwip/inet.h>
-#include <lwip/inet_chksum.h>
-#include <lwip/ip.h>
 #include <lwip/ip_route.h>
-#include <lwip/netdb.h>
-#include <lwip/sockets.h>
 
 #define RTACTION_ADD 1   /* add action */
 #define RTACTION_DEL 2   /* del action */
@@ -39,10 +29,9 @@ int route4_add(char* ifname, char* ip_addr, char* nm_addr)
         rt_kprintf("Can find network interface! \r\n");
         return -1;
     }
-
-    ip4addr_aton(ip_addr, &ip4_address);
-    ip4addr_aton(nm_addr, &ip4_netmask);
-
+    if (ip4addr_aton(ip_addr, &ip4_address) == 0 || ip4addr_aton(nm_addr, &ip4_netmask) == 0) {
+        return -1;
+    }
     route_ip4_add(&ip4_address, &ip4_netmask, pnetif);
     return 0;
 }
@@ -60,8 +49,9 @@ int route4_delete(char* ip_addr, char* nm_addr)
     ip4_addr_t ip4_address;
     ip4_addr_t ip4_netmask;
 
-    ip4addr_aton(ip_addr, &ip4_address);
-    ip4addr_aton(nm_addr, &ip4_netmask);
+    if (ip4addr_aton(ip_addr, &ip4_address) == 0 || ip4addr_aton(nm_addr, &ip4_netmask) == 0) {
+        return -1;
+    }
 
     route_ip4_delete(&ip4_address, &ip4_netmask);
     return 0;
@@ -88,7 +78,9 @@ int route6_add(char* ifname, char* ip6_addr)
         return -1;
     }
 
-    ip6addr_aton(ip6_addr, (ip6_addr_t *)&ip6_address);
+    if (ip6addr_aton(ip6_addr, (ip6_addr_t *)&ip6_address) == 0) {
+        return -1;
+    }
 
     route_ip6_add(&ip6_address, pnetif);
     return 0;
@@ -97,7 +89,7 @@ int route6_add(char* ifname, char* ip6_addr)
 /*********************************************************
 **   function name:         route6_delete
 **   Descriptions:          删除IPv6路由表
-**   input parameters:      
+**   input parameters:
 **                          ip_addr:删除的路由表IP地址前缀
 **   outout parameters:     无
 **   Returned value:        无
@@ -106,7 +98,9 @@ int route6_delete(char* ip6_addr)
 {
     ip6_addr_t ip6_address;
 
-    ip6addr_aton(ip6_addr, &ip6_address);
+    if (ip6addr_aton(ip6_addr, (ip6_addr_t *)&ip6_address) == 0) {
+        return -1;
+    }
 
     route_ip6_delete(&ip6_address);
     return 0;
@@ -115,8 +109,9 @@ int route6_delete(char* ip6_addr)
 
 void usage()
 {
-    rt_kprintf("IPv4 Command: route inet add/del -net/-host TARGET netmask gw dev \n");
-    rt_kprintf("IPv6 Command: route inet6 add/del -net TARGET dev\n");
+    rt_kprintf("IPv4 Command: route inet add/del -net/-host TARGET netmask dev/device \n");
+    rt_kprintf("IPv6 Command: route inet6 add/del -net TARGET dev/device\n");
+    rt_kprintf("Command: route -n find route  route -help is help   \n");
     return ;
 }
 
@@ -125,40 +120,39 @@ void usage()
 /* main part of this function is from net-tools inet6_sr.c file */
 static int inet6_setroute(int action, char **args)
 {
-    char target[128];
-    char *devname = NULL;         /* device name */
+    char target[64] = {0};
+    char devname[8] = {0};         /* device name */
 
-    if (*args == NULL )
-    {
+    args++;
+    if (rt_strlen(*args) < 64) {
+        strcpy(target, *args);
+    } else {
         usage();
         return -1;
     }
-    args++;
-    strcpy(target, *args);
 
     args++;
     if (!strcmp(*args, "device") || !strcmp(*args, "dev"))
     {
         args++;
-        if (!*args)
-            return -1;
+        if (rt_strlen(*args) < 8) {
+            strcpy(devname, *args);
+        }
     } else {
         usage();
         return -1;
     }
-    devname = *args;
-    args++;
 
     /* Tell the kernel to accept this route. */
     if (action == RTACTION_ADD)
     {
-        if(route6_add(devname, target) != 0)
+        if (route6_add(devname, target) != 0)
         {
             rt_kprintf("route6_add  failure \n");
             return -1;
         }
     } else {
-        if(route6_delete(target) != 0)
+        if (route6_delete(target) != 0)
         {
             rt_kprintf("route6_delete  failure \n");
             return -1;
@@ -172,47 +166,40 @@ static int inet6_setroute(int action, char **args)
  */
 int inet_setroute(int action, char **args)
 {
-    char target[128] = {0};
-    char gateway[128] = {0};
-    char netmask[128] = {0};
-    char ifname[16] = {0};
+    char target[16] = {0};
+    char netmask[16] = {0};
+    char ifname[8] = {0};
 
     while(args)
     {
-        if(*args == NULL)
+        if (*args == NULL)
         {
             break;
         }
-        if(!strcmp(*args, "-net"))
+        if (!strcmp(*args, "-net") || !strcmp(*args, "-host"))
         {/* default is a network target */
             args++;
-            strcpy(target, *args);
-            args++;            
-            continue;
-        } else if(!strcmp(*args, "-host")) {/* target is a host */
-            args++;
-            strcpy(target, *args);
+            if (rt_strlen(*args) < 16) {
+                strcpy(target, *args);
+            }
             args++;
             continue;
         }
-        if(!strcmp(*args, "netmask"))
+        if (!strcmp(*args, "netmask"))
         {/* netmask setting */
             args++;
-            strcpy(netmask, *args);
+            if (rt_strlen(*args) < 16) {
+                strcpy(netmask, *args);
+            }
             args++;
             continue;
         }
-        if(!strcmp(*args, "gw") || !strcmp(*args, "gateway"))
-        {/* gateway setting */
-            args++;
-            strcpy(gateway, *args);
-            args++;
-            continue;
-        }
-        if(!strcmp(*args, "device") || !strcmp(*args, "dev"))
+        if (!strcmp(*args, "device") || !strcmp(*args, "dev"))
         {/* device setting */
             args++;
-            strcpy(ifname, *args);
+            if (rt_strlen(*args) < 8) {
+                strcpy(ifname, *args);
+            }
             args++;
             continue;
         }
@@ -221,15 +208,15 @@ int inet_setroute(int action, char **args)
     }
 
     /* tell the kernel to accept this route */
-    if(action == RTACTION_DEL)
+    if (action == RTACTION_DEL)
     {/* del a route item */
-        if(route4_delete(target, netmask) != 0)
+        if (route4_delete(target, netmask) != 0)
         {
             rt_kprintf("route4_delete  failure \n");
             return -1;
         }
     } else {/* add a route item */
-        if(route4_add(ifname, target, netmask) != 0)
+        if (route4_add(ifname, target, netmask) != 0)
         {
             rt_kprintf("route4_add  failure \n");
             return -1;
@@ -253,32 +240,38 @@ FINSH_FUNCTION_EXPORT(route, route network host);
 static int cmd_route(int argc, char **argv)
 {
     int action = 0;
-    if(argc < 2 || (!strcmp(argv[1], "-help")))
-    {
-        usage();
-        return -1;
-    }
-    if(!strcmp(argv[1], "-n"))
-    {
-        inet_findroute();
+
+    if (argc == 2) {
+        if (!strcmp(argv[1], "-n")) {
+            inet_findroute();
+        } else {
+            usage();
+        }
         return 0;
     }
-    
-    if(!strcmp(argv[2], "add"))
+    if (argc < 7) {
+        usage();
+        return 0;
+    }
+
+    if (!strcmp(argv[2], "add"))
     {
         action = RTACTION_ADD;
     } else if (!strcmp(argv[2], "del")) {
         action = RTACTION_DEL;
+    } else {
+        usage();
+        return 0;
     }
 
     /* add or del a ipv4 route item */
-    if(!strcmp(argv[1], "inet"))
+    if (!strcmp(argv[1], "inet") && argc == 9)
     {
         inet_setroute(action, argv+3);
     }
     /* add  or del a ipv6 route item */
 #if LWIP_IPV6
-    if(!strcmp(argv[1], "inet6"))
+    if (!strcmp(argv[1], "inet6") && argc == 7)
     {
         inet6_setroute(action, argv+3);
     }

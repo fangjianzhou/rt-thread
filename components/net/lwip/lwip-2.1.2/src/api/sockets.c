@@ -992,7 +992,7 @@ put_cmsg(struct msghdr *msg, int level, int type, int len, void *data)
   return;
 }
 
-#if LWIP_TIMESTAMPS
+#ifdef LWIP_TIMESTAMPS
 /** set sock timestamps flags */
 static void
 lwip_sock_set_timestamps(struct lwip_sock *sock, int val, int new, int ns) {
@@ -1511,7 +1511,7 @@ lwip_recvmsg(int s, struct msghdr *message, int flags)
   if (!sock) {
     return -1;
   }
-#if LWIP_TIMESTAMPS
+#ifdef LWIP_TIMESTAMPS
   if ((flags & MSG_ERRQUEUE))
   {
     struct pbuf *p = NULL;

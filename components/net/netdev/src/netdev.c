@@ -542,6 +542,7 @@ int netdev_dhcp_enabled(struct netdev *netdev, rt_bool_t is_enabled)
 int netdev_set_ipaddr(struct netdev *netdev, const ip_addr_t *ip_addr)
 {
     int err;
+
     RT_ASSERT(netdev);
     RT_ASSERT(ip_addr);
 
@@ -564,7 +565,6 @@ int netdev_set_ipaddr(struct netdev *netdev, const ip_addr_t *ip_addr)
     if (err == 0)
         rtnl_ip_notify(netdev, RTM_SETLINK);
 #endif
-
 
     return err;
 }

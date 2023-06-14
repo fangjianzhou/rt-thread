@@ -696,6 +696,22 @@ void mem_overflow_init_raw(void *p, size_t size)
 struct netif *lwip_ip4_route_src(const ip4_addr_t *dest, const ip4_addr_t *src)
 {
     struct netif *netif;
+
+    if (src != NULL) {
+    /* iterate through netifs */
+        for (netif = netif_list; netif != NULL; netif = netif->next)
+        {
+            /* is the netif up, does it have a link and a valid address? */
+            if (netif_is_up(netif) && netif_is_link_up(netif) && !ip4_addr_isany_val(*netif_ip4_addr(netif)))
+            {
+                /* source ip address equals netif's ip address? */
+                if (ip4_addr_cmp(src, netif_ip4_addr(netif)))
+                {
+                    return netif;
+                }
+            }
+        }
+    }
 /* [LWIPROUTE_ROUTE_0515] */
 #ifdef LWIP_HOOK_IP4_ROUTE
     netif = LWIP_HOOK_IP4_ROUTE(dest);
@@ -703,21 +719,6 @@ struct netif *lwip_ip4_route_src(const ip4_addr_t *dest, const ip4_addr_t *src)
         return netif;
     }
 #endif
-    if (src == NULL)
-        return NULL;
-    /* iterate through netifs */
-    for (netif = netif_list; netif != NULL; netif = netif->next)
-    {
-        /* is the netif up, does it have a link and a valid address? */
-        if (netif_is_up(netif) && netif_is_link_up(netif) && !ip4_addr_isany_val(*netif_ip4_addr(netif)))
-        {
-            /* source ip address equals netif's ip address? */
-            if (ip4_addr_cmp(src, netif_ip4_addr(netif)))
-            {
-                return netif;
-            }
-        }
-    }
 
     return NULL;
 }

@@ -110,8 +110,8 @@ rt_weak const char *rt_hw_cpu_arch(void)
 
 rt_weak void rt_hw_cpu_reset(void)
 {
-    RT_DEBUG_LOG(RT_DEBUG_DEVICE, ("rt_hw_cpu_reset() doesn't support for this board."
-        "Please consider implementing rt_hw_cpu_reset() in another file.\n"));
+    LOG_D("rt_hw_cpu_reset() doesn't support for this board."
+        "Please consider implementing rt_hw_cpu_reset() in another file.");
     return ;
 }
 

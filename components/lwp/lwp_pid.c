@@ -377,6 +377,9 @@ rt_lwp_t lwp_create(rt_base_t flags)
             {
                 new_lwp->pid = pid;
                 lwp_pid_set_lwp_locked(pid, new_lwp);
+#ifdef RT_USING_DFS_PROCFS
+                proc_pid(pid);
+#endif
             }
             lwp_pid_lock_release();
         }

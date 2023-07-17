@@ -249,6 +249,7 @@ struct netconn {
   /** only used for socket layer */
 #if LWIP_SOCKET
   int socket;
+  /* LWIPPTP_SWREQ_0029 */
   void *sock;
 #endif /* LWIP_SOCKET */
 #if LWIP_SO_SNDTIMEO

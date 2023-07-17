@@ -62,6 +62,7 @@ struct sal_socket
 #endif
 };
 
+/* LWIPPTP_SWREQ_0036 */
 /* network interface socket opreations */
 struct sal_socket_ops
 {

@@ -191,6 +191,7 @@ int recv(int s, void *mem, size_t len, int flags)
 }
 RTM_EXPORT(recv);
 
+/* LWIPPTP_SWREQ_0036 */
 int sendmsg(int s, const struct msghdr *message, int flags)
 {
     int socket = dfs_net_getsocket(s);
@@ -199,6 +200,7 @@ int sendmsg(int s, const struct msghdr *message, int flags)
 }
 RTM_EXPORT(sendmsg);
 
+/* LWIPPTP_SWREQ_0036 */
 int recvmsg(int s, struct msghdr *message, int flags)
 {
     int socket = dfs_net_getsocket(s);

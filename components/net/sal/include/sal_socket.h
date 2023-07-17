@@ -118,6 +118,7 @@ typedef uint16_t in_port_t;
 #define MSG_OOB         0x04    /* Unimplemented: Requests out-of-band data. The significance and semantics of out-of-band data are protocol-specific */
 #define MSG_DONTWAIT    0x08    /* Nonblocking i/o for this operation only */
 #define MSG_MORE        0x10    /* Sender will send more */
+/* LWIPPTP_SWREQ_0036 */
 #define MSG_ERRQUEUE    0x2000  /* Fetch message from error queue */
 
 /* Options for level IPPROTO_IP */
@@ -227,6 +228,7 @@ struct sockaddr_storage
 #endif /* NETDEV_IPV6 */
 };
 
+/* LWIPPTP_SWREQ_0036 */
 #ifdef RT_USING_MUSLLIBC
 #ifndef __DEFINED_struct_iovec
 struct iovec
@@ -237,6 +239,7 @@ struct iovec
 #endif
 #endif
 
+/* LWIPPTP_SWREQ_0036 */
 struct msghdr
 {
     void            *msg_name;
@@ -248,6 +251,7 @@ struct msghdr
     int              msg_flags;
 };
 
+/* LWIPPTP_SWREQ_0036 */
 /* RFC 3542, Section 20: Ancillary Data */
 struct cmsghdr
 {
@@ -256,6 +260,7 @@ struct cmsghdr
     int     cmsg_type;  /* protocol-specific type */
 };
 
+/* LWIPPTP_SWREQ_0036 */
 #define CMSG_NXTHDR(mhdr, cmsg) cmsg_nxthdr((mhdr), (cmsg))
 
 #define CMSG_ALIGN(len) (((len) + sizeof(long) - 1) & ~(sizeof(long)-1))

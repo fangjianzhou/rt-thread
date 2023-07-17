@@ -95,9 +95,12 @@ struct lwip_sock {
 #define LWIP_SOCK_FD_FREE_FREE 2
 #endif
 
+  /* LWIPPTP_SWREQ_0032 */
   u32_t sk_flags;
 
+/* LWIPPTP_SWREQ_0024 */
 #ifdef LWIP_TIMESTAMPS
+  /* LWIPPTP_SWREQ_0033 */
   u16_t sk_tsflags;
   u32_t p_error_qidx;
   u32_t p_error_last_qidx;
@@ -109,6 +112,8 @@ struct lwip_sock {
   rt_wqueue_t wait_head;
 #endif
 };
+
+/* LWIPPTP_SWREQ_0032 */
 
 /* Sock flags */
 enum sock_flags {
@@ -122,6 +127,8 @@ enum sock_flags {
   /* Indicates 64 bit timestamps always */
   SOCK_TSTAMP_NEW,
 };
+
+/* LWIPPTP_SWREQ_0032 */
 
 /** set sock flags */
 #define lwip_sock_set_flag(sk, flag)    ((sk)->sk_flags |= (1 << (flag)))

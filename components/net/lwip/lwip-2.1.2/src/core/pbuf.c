@@ -1533,6 +1533,8 @@ pbuf_strstr(const struct pbuf *p, const char *substr)
   return pbuf_memfind(p, substr, (u16_t)substr_len, 0);
 }
 
+/* LWIPPTP_SWREQ_0025 */
+
 #ifdef LWIP_TIMESTAMPS
 /**
  * Check if have timestamps with flags.
@@ -1583,6 +1585,7 @@ pbuf_tstamp_tx(struct pbuf *orig_p, s64_t hwtstamp, s64_t swtstamp)
   p->hwtstamp = hwtstamp;
   p->swtstamp = swtstamp;
 
+  /* LWIPPTP_SWREQ_0026 */
   if (sock_queue_err_pbuf(sk, p)) {
     pbuf_free(p);
   }

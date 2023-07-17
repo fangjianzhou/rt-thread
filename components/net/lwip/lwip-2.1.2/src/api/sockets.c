@@ -718,6 +718,8 @@ lwip_accept(int s, struct sockaddr *addr, socklen_t *addrlen)
   SYS_ARCH_PROTECT(lev);
   recvevent = (s16_t)(-1 - newconn->socket);
   newconn->socket = newsock;
+  /* LWIPPTP_SWREQ_0028 */
+  /* LWIPPTP_SWREQ_0029 */
   newconn->sock = nsock;
   SYS_ARCH_UNPROTECT(lev);
 
@@ -993,6 +995,7 @@ put_cmsg(struct msghdr *msg, int level, int type, int len, void *data)
 }
 
 #ifdef LWIP_TIMESTAMPS
+/* LWIPPTP_SWREQ_0032 */
 /** set sock timestamps flags */
 static void
 lwip_sock_set_timestamps(struct lwip_sock *sock, int val, int new, int ns) {
@@ -1014,6 +1017,8 @@ lwip_sock_set_timestamps(struct lwip_sock *sock, int val, int new, int ns) {
     lwip_sock_clear_flag(sock, SOCK_RCVTSTAMPNS);
   }
 }
+
+/* LWIPPTP_SWREQ_0034 */
 /* Check if msg has storage to save timestamping.
  */
 static int
@@ -1021,6 +1026,7 @@ cmsg_has_timestamping_storage(struct lwip_sock *sock, struct msghdr *msg)
 {
   int total_size = 0;
 
+  /* LWIPPTP_SWREQ_0032 */
   if (lwip_sock_test_flag(sock, SOCK_RCVTSTAMP)) {
     /* LWIP_TIMESTAMPS only support 64bit, so we only SO_TIMESTAMP_NEW and SO_TIMESTAMP_OLD type */
     total_size += CMSG_SPACE(sizeof(struct timespec));
@@ -1039,6 +1045,8 @@ cmsg_has_timestamping_storage(struct lwip_sock *sock, struct msghdr *msg)
 
   return 0;
 }
+
+/* LWIPPTP_SWREQ_0035 */
 /* Put pbuf's timestamping to cmsg, MUST call `cmsg_has_timestamping_storage` before.
  */
 static void
@@ -1048,6 +1056,7 @@ put_cmsg_scm_timestamping(struct lwip_sock *sock, struct msghdr *msg, struct pbu
   long sw_tv_sec, sw_tv_nsec;
   void *control = msg->msg_control;
   int controllen = msg->msg_controllen;
+  /* LWIPPTP_SWREQ_0032 */
   int cmsg_type, new_tstamp = lwip_sock_test_flag(sock, SOCK_TSTAMP_NEW);
 
   hw_tv_nsec = p->hwtstamp;
@@ -1055,9 +1064,11 @@ put_cmsg_scm_timestamping(struct lwip_sock *sock, struct msghdr *msg, struct pbu
   sw_tv_nsec = p->swtstamp;
   sw_tv_sec = sw_tv_nsec / 1000000000ULL;
 
+  /* LWIPPTP_SWREQ_0032 */
   if (lwip_sock_test_flag(sock, SOCK_RCVTSTAMP)) {
     struct timespec ts;
 
+    /* LWIPPTP_SWREQ_0032 */
     if (!lwip_sock_test_flag(sock, SOCK_RCVTSTAMPNS)) {
       cmsg_type = new_tstamp ? SO_TIMESTAMP_NEW : SO_TIMESTAMP_OLD;
 
@@ -1172,6 +1183,8 @@ lwip_recv_tcp(struct lwip_sock *sock, struct msghdr *message, void *mem, size_t 
     recv_left -= copylen;
 
 #ifdef LWIP_TIMESTAMPS
+    /* LWIPPTP_SWREQ_0032 */
+    /* LWIPPTP_SWREQ_0035 */
     if (message && p &&
       (lwip_sock_test_flag(sock, SOCK_RCVTSTAMP) || lwip_sock_test_flag(sock, SOCK_RCVTSTAMPNS))) {
       int status = cmsg_has_timestamping_storage(sock, message);
@@ -1374,6 +1387,8 @@ lwip_recvfrom_udp_raw(struct lwip_sock *sock, int flags, struct msghdr *msg, u16
     }
 #endif /* LWIP_NETBUF_RECVINFO */
 #ifdef LWIP_TIMESTAMPS
+    /* LWIPPTP_SWREQ_0032 */
+    /* LWIPPTP_SWREQ_0035 */
     if (!msg->msg_flags &&
       (lwip_sock_test_flag(sock, SOCK_RCVTSTAMP) || lwip_sock_test_flag(sock, SOCK_RCVTSTAMPNS))) {
       int status = cmsg_has_timestamping_storage(sock, msg);
@@ -1512,6 +1527,7 @@ lwip_recvmsg(int s, struct msghdr *message, int flags)
     return -1;
   }
 #ifdef LWIP_TIMESTAMPS
+  /* LWIPPTP_SWREQ_0035 */
   if ((flags & MSG_ERRQUEUE))
   {
     struct pbuf *p = NULL;
@@ -1519,6 +1535,7 @@ lwip_recvmsg(int s, struct msghdr *message, int flags)
 
     message->msg_flags = 0;
 
+    /* LWIPPTP_SWREQ_0027 */
     if (!status) {
       p = sock_dequeue_err_pbuf(sock);
       if (p) {
@@ -1776,6 +1793,7 @@ lwip_sendmsg(int s, const struct msghdr *msg, int flags)
       if (chain_buf.p == NULL) {
         chain_buf.p = chain_buf.ptr = p;
         /* add pbuf to existing pbuf chain */
+        /* LWIPPTP_SWREQ_0031 */
 #ifdef LWIP_TIMESTAMPS
         chain_buf.p->sk = sock;
         chain_buf.p->hwtstamp = 0;
@@ -1908,6 +1926,7 @@ lwip_sendto(int s, const void *data, size_t size, int flags,
   err = netbuf_ref(&buf, data, short_size);
 #endif /* LWIP_NETIF_TX_SINGLE_PBUF */
   if (err == ERR_OK) {
+    /* LWIPPTP_SWREQ_0031 */
 #ifdef LWIP_TIMESTAMPS
     buf.p->sk = sock;
     buf.p->hwtstamp = 0;
@@ -1988,6 +2007,7 @@ lwip_socket(int domain, int type, int protocol)
     set_errno(ENFILE);
     return -1;
   }
+  /* LWIPPTP_SWREQ_0029 */
   sock = &sockets[i - LWIP_SOCKET_OFFSET];
   conn->socket = i;
   conn->sock = sock;
@@ -3253,6 +3273,7 @@ lwip_getsockopt_impl(int s, int level, int optname, void *optval, socklen_t *opt
         break;
 #endif /* LWIP_SO_LINGER */
 #ifdef LWIP_TIMESTAMPS
+        /* LWIPPTP_SWREQ_0032 */
         case SO_TIMESTAMP_OLD:
           *(int *)optval = lwip_sock_test_flag(sock, SOCK_RCVTSTAMP) &&
               lwip_sock_test_flag(sock, SOCK_TSTAMP_NEW) &&
@@ -3689,6 +3710,7 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
         break;
 #endif /* LWIP_SO_LINGER */
 #ifdef LWIP_TIMESTAMPS
+        /* LWIPPTP_SWREQ_0032 */
         case SO_TIMESTAMP_OLD:
           lwip_sock_set_timestamps(sock, *(int *)optval, 0, 0);
           break;

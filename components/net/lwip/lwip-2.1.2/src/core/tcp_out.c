@@ -1357,6 +1357,8 @@ tcp_output(struct tcp_pcb *pcb)
       TCPH_SET_FLAG(seg->tcphdr, TCP_ACK);
     }
 
+    /* LWIPPTP_SWREQ_0030 */
+    /* LWIPPTP_SWREQ_0031 */
 #ifdef LWIP_TIMESTAMPS
     /* Maybe it's not a good idea to make this
      * interface to the socket layer, but it work */

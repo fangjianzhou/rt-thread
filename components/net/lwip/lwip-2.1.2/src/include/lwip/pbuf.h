@@ -223,6 +223,8 @@ struct pbuf {
   /** For incoming packets, this contains the input netif's index */
   u8_t if_idx;
 
+/* LWIPPTP_SWREQ_0023 */
+/* LWIPPTP_SWREQ_0024 */
 #ifdef LWIP_TIMESTAMPS
   s64_t hwtstamp;
   s64_t swtstamp;
@@ -325,6 +327,7 @@ u16_t pbuf_memcmp(const struct pbuf* p, u16_t offset, const void* s2, u16_t n);
 u16_t pbuf_memfind(const struct pbuf* p, const void* mem, u16_t mem_len, u16_t start_offset);
 u16_t pbuf_strstr(const struct pbuf* p, const char* substr);
 
+/* LWIPPTP_SWREQ_0025 */
 #ifdef LWIP_TIMESTAMPS
 u8_t pbuf_tstamp_enable(struct pbuf *p, int flags);
 void pbuf_tstamp_tx(struct pbuf *orig_p, s64_t hwtstamp, s64_t swtstamp);

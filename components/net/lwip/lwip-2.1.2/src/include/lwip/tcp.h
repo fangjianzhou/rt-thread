@@ -387,6 +387,7 @@ struct tcp_pcb {
   u8_t rcv_scale;
 #endif
 
+  /* LWIPPTP_SWREQ_0030 */
   void *sock;
 };
 

@@ -196,6 +196,7 @@ void lwp_cleanup(struct rt_thread *tid);
                 case INTF_SO_NO_CHECK:
                     *optname = IMPL_SO_NO_CHECK;
                     break;
+                /* LWIPPTP_SWREQ_0038 */
                 case INTF_SO_BINDTODEVICE:
                     *optname = IMPL_SO_BINDTODEVICE;
                     break;
@@ -3562,6 +3563,7 @@ static int netflags_muslc_2_lwip(int flags)
     {
         flgs |= MSG_MORE;
     }
+    /* LWIPPTP_SWREQ_0038 */
     if (flags & MSG_ERRQUEUE)
     {
         flgs |= MSG_ERRQUEUE;
@@ -3570,6 +3572,7 @@ static int netflags_muslc_2_lwip(int flags)
 }
 
 #ifdef ARCH_MM_MMU
+/* LWIPPTP_SWREQ_0039 */
 static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg,
         struct iovec **out_iov, void **out_msg_control)
 {
@@ -3654,6 +3657,7 @@ static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg,
 }
 #endif /* ARCH_MM_MMU */
 
+/* LWIPPTP_SWREQ_0037 */
 sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
 {
     int flgs, ret = -1;
@@ -3675,6 +3679,7 @@ sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
 
     if (!ret)
     {
+        /* LWIPPTP_SWREQ_0039 */
         kiov = kmsg.msg_iov;
 
         for (int i = 0; i < kmsg.msg_iovlen; ++i)
@@ -3687,6 +3692,7 @@ sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
 
         lwp_get_from_user(kmsg.msg_control, msg_control, kmsg.msg_controllen);
 
+        /* LWIPPTP_SWREQ_0036 */
         ret = sendmsg(socket, &kmsg, flgs);
 
         kmem_put(kmsg.msg_iov->iov_base);
@@ -3706,6 +3712,7 @@ sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
+/* LWIPPTP_SWREQ_0037 */
 sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
 {
     int flgs, ret = -1;
@@ -3727,6 +3734,7 @@ sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
 
     if (!ret)
     {
+        /* LWIPPTP_SWREQ_0036 */
         ret = recvmsg(socket, &kmsg, flgs);
 
         if (ret < 0)
@@ -3734,6 +3742,7 @@ sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
             goto _free_res;
         }
 
+        /* LWIPPTP_SWREQ_0039 */
         kiov = kmsg.msg_iov;
 
         for (int i = 0; i < kmsg.msg_iovlen; ++i)

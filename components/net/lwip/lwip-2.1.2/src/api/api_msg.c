@@ -1740,6 +1740,9 @@ err_mem:
       }
     }
 
+    /* LWIPPTP_SWREQ_0029 */
+    /* LWIPPTP_SWREQ_0030 */
+    /* LWIPPTP_SWREQ_0031 */
     conn->pcb.tcp->sock = conn->sock;
 
     if (err == ERR_OK) {

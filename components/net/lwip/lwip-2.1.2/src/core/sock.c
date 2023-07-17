@@ -40,6 +40,7 @@
 #include "lwip/priv/sockets_priv.h"
 
 #ifdef LWIP_TIMESTAMPS
+/* LWIPPTP_SWREQ_0026 */
 /** Submit a error pbuf to sock
  */
 int sock_queue_err_pbuf(struct lwip_sock *sk, struct pbuf *p)
@@ -66,6 +67,7 @@ int sock_queue_err_pbuf(struct lwip_sock *sk, struct pbuf *p)
   return 0;
 }
 
+/* LWIPPTP_SWREQ_0027 */
 /** Extract a error pbuf to sock
  */
 struct pbuf *sock_dequeue_err_pbuf(struct lwip_sock *sk)

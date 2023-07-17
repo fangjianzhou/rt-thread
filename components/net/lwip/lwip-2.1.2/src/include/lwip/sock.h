@@ -48,7 +48,9 @@ extern "C" {
 #endif
 
 #ifdef LWIP_TIMESTAMPS
+/* LWIPPTP_SWREQ_0026 */
 int sock_queue_err_pbuf(struct lwip_sock *sk, struct pbuf *p);
+/* LWIPPTP_SWREQ_0027 */
 struct pbuf *sock_dequeue_err_pbuf(struct lwip_sock *sk);
 #endif /* LWIP_TIMESTAMPS */
 

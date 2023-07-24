@@ -179,18 +179,6 @@ extern "C" {
 
 #ifdef RT_USING_DM
 #include "drivers/core/rtdm.h"
-
-#ifdef RT_USING_OFW
-#include "drivers/ofw.h"
-#include "drivers/ofw_fdt.h"
-#include "drivers/ofw_io.h"
-#include "drivers/ofw_irq.h"
-#include "drivers/ofw_raw.h"
-#endif /* RT_USING_OFW */
-
-#ifdef RT_USING_PIC
-#include "drivers/pic.h"
-#endif
 #endif /* RT_USING_DM */
 
 #ifdef __cplusplus

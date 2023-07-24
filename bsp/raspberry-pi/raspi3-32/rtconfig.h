@@ -150,7 +150,6 @@
 /* Utilities */
 
 #define RT_USING_ADT
-#define RT_USING_ADT_AVL
 #define RT_USING_ADT_BITMAP
 #define RT_USING_ADT_HASHMAP
 #define RT_USING_ADT_REF

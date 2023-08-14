@@ -108,13 +108,6 @@ rt_weak const char *rt_hw_cpu_arch(void)
     return "unknown";
 }
 
-rt_weak void rt_hw_cpu_reset(void)
-{
-    LOG_D("rt_hw_cpu_reset() doesn't support for this board."
-        "Please consider implementing rt_hw_cpu_reset() in another file.");
-    return ;
-}
-
 struct _errno_str_t
 {
     rt_err_t error;

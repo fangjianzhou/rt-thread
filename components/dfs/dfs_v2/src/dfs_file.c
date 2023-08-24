@@ -19,7 +19,7 @@
 #include "dfs_mnt.h"
 #include "dfs_private.h"
 
-#ifdef RT_USING_DFS_CACHE
+#ifdef RT_USING_PCACHE
 #include "dfs_pcache.h"
 #endif
 

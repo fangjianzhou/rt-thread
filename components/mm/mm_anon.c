@@ -454,6 +454,8 @@ static struct rt_private_ctx _priv_obj = {
     .mem_obj.on_varea_merge = _anon_varea_merge,
     .mem_obj.page_read = _anon_page_read,
     .mem_obj.page_write = _anon_page_write,
+    .mem_obj.page_read = page_read,
+    .mem_obj.page_write = page_write,
 };
 
 rt_inline rt_private_ctx_t rt_private_obj_create_n_bind(rt_aspace_t aspace)

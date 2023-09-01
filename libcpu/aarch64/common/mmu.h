@@ -57,7 +57,6 @@ struct mem_desc
 #define MMU_MAP_CUSTOM(ap, mtype)                                              \
     ((0x1UL << MMU_AF_SHIFT) | (0x2UL << MMU_SHARED_SHIFT) |                   \
      ((ap) << MMU_AP_SHIFT) | ((mtype) << MMU_MA_SHIFT))
-
 #define MMU_MAP_K_ROCB      MMU_MAP_CUSTOM(MMU_AP_KRUN, NORMAL_MEM)
 #define MMU_MAP_K_RO        MMU_MAP_CUSTOM(MMU_AP_KRUN, NORMAL_NOCACHE_MEM)
 #define MMU_MAP_K_RWCB      MMU_MAP_CUSTOM(MMU_AP_KAUN, NORMAL_MEM)

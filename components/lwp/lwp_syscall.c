@@ -1357,7 +1357,7 @@ rt_event_t sys_event_create(const char *name, rt_uint8_t flag)
         return RT_NULL;
     }
 
-    if (lwp_get_from_user(kname, (void *)name, len + 1) != (len + 1))
+    if (lwp_get_from_user(kname, (void *)name, len + 1) <= 0)
     {
         kmem_put(kname);
         return RT_NULL;

@@ -247,10 +247,6 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     thread->cleanup   = 0;
     thread->user_data = 0;
 
-    /* initialize user_time and system_time */
-    thread->user_time = 0;
-    thread->system_time = 0;
-
     /* initialize thread timer */
     rt_timer_init(&(thread->thread_timer),
                   thread->parent.name,

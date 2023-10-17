@@ -321,7 +321,6 @@ void rt_thread_idle_init(void)
 #if RT_NAME_MAX > 0
     char idle_thread_name[RT_NAME_MAX];
 #endif /* RT_NAME_MAX > 0 */
-    struct rt_cpu *pcpu;
 
     for (i = 0; i < _CPUS_NR; i++)
     {
@@ -345,8 +344,6 @@ void rt_thread_idle_init(void)
 
         rt_cpu_index(i)->idle_thread = &idle_thread[i];
 #endif /* RT_USING_SMP */
-        pcpu = rt_cpu_index(i);
-        pcpu->idle_thread = &idle_thread[i];
         /* startup */
         rt_thread_startup(&idle_thread[i]);
     }

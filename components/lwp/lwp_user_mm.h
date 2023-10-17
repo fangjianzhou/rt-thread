@@ -66,7 +66,6 @@ int lwp_munmap(struct rt_lwp *lwp, void *addr, size_t length);
  */
 int lwp_user_accessible_ext(struct rt_lwp *lwp, void *addr, size_t size);
 
-<<<<<<< HEAD
 /**
  * @brief Test if address from user is accessible address by user
  *        Same as lwp_user_accessible_ext except that lwp is current lwp

@@ -19,10 +19,6 @@
 #include "dfs_mnt.h"
 #include "dfs_private.h"
 
-#ifdef RT_USING_PCACHE
-#include "dfs_pcache.h"
-#endif
-
 #ifdef RT_USING_PAGECACHE
 #include "dfs_pcache.h"
 #endif

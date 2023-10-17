@@ -9,7 +9,6 @@
  * 2012-12-12     heyuanjie87  change endpoint and function handler
  * 2013-04-26     aozima       add DEVICEQUALIFIER support.
  * 2017-11-15     ZYH          fix ep0 transform error
- * 2023-10-11     ChuShicheng  change rt_size_t to rt_ssize_t
  */
 
 #ifndef  __USB_DEVICE_H__

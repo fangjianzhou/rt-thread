@@ -344,6 +344,10 @@ void rt_thread_idle_init(void)
 
         rt_cpu_index(i)->idle_thread = &idle_thread[i];
 #endif /* RT_USING_SMP */
+
+#ifdef RT_USING_SCHEDULER_EXT
+        rt_scheduler_ext_idle_init(i, &idle_thread[i]);
+#endif
         /* startup */
         rt_thread_startup(&idle_thread[i]);
     }

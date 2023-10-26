@@ -753,6 +753,10 @@ enum
 #define RT_STOP_IPI                     1
 #endif /* RT_STOP_IPI */
 
+#ifdef RT_USING_SCHEDULER_EXT
+#include "sched_ext.h"
+#endif
+
 struct rt_cpu_usage_stats
 {
     rt_uint64_t user;
@@ -785,6 +789,10 @@ struct rt_cpu
     rt_atomic_t                 tick;
 
     struct rt_spinlock          spinlock;
+
+#ifdef RT_USING_SCHEDULER_EXT
+    struct scheduler_cpu_ext    scheduler_cpu_ext;
+#endif
 #ifdef RT_USING_SMART
     struct rt_cpu_usage_stats   cpu_stat;
 #endif
@@ -982,6 +990,10 @@ struct rt_thread
     int                         *clear_child_tid;
 #endif /* ARCH_MM_MMU */
 #endif /* RT_USING_SMART */
+
+#ifdef RT_USING_SCHEDULER_EXT
+    struct scheduler_thread_ext scheduler_thread_ext;
+#endif
 
 #ifdef RT_USING_MEM_PROTECTION
     void *mem_regions;

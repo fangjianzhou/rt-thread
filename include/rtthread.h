@@ -30,6 +30,7 @@
 #include <rtservice.h>
 #include <rtm.h>
 #include <rtatomic.h>
+#include <rtsched.h>
 #ifdef RT_USING_LEGACY
 #include <rtlegacy.h>
 #endif
@@ -190,30 +191,6 @@ rt_err_t rt_thread_idle_sethook(void (*hook)(void));
 rt_err_t rt_thread_idle_delhook(void (*hook)(void));
 #endif /* defined(RT_USING_HOOK) || defined(RT_USING_IDLE_HOOK) */
 rt_thread_t rt_thread_idle_gethandler(void);
-
-/*
- * schedule service
- */
-void rt_system_scheduler_init(void);
-void rt_system_scheduler_start(void);
-
-void rt_schedule(void);
-void rt_schedule_insert_thread(struct rt_thread *thread);
-void rt_schedule_remove_thread(struct rt_thread *thread);
-
-void rt_enter_critical(void);
-void rt_exit_critical(void);
-rt_uint16_t rt_critical_level(void);
-
-#ifdef RT_USING_HOOK
-void rt_scheduler_sethook(void (*hook)(rt_thread_t from, rt_thread_t to));
-void rt_scheduler_switch_sethook(void (*hook)(struct rt_thread *tid));
-#endif /* RT_USING_HOOK */
-
-#ifdef RT_USING_SMP
-void rt_secondary_cpu_entry(void);
-void rt_scheduler_ipi_handler(int vector, void *param);
-#endif /* RT_USING_SMP */
 
 /**@}*/
 

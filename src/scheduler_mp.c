@@ -70,7 +70,7 @@ static void (*rt_scheduler_switch_hook)(struct rt_thread *tid);
  *
  * @param hook is the hook function.
  */
-void rt_scheduler_sethook(void (*hook)(struct rt_thread *from, struct rt_thread *to))
+static void _mp_scheduler_sethook(void (*hook)(struct rt_thread *from, struct rt_thread *to))
 {
     rt_scheduler_hook = hook;
 }
@@ -81,7 +81,7 @@ void rt_scheduler_sethook(void (*hook)(struct rt_thread *from, struct rt_thread 
  *
  * @param hook is the hook function.
  */
-void rt_scheduler_switch_sethook(void (*hook)(struct rt_thread *tid))
+static void _mp_scheduler_switch_sethook(void (*hook)(struct rt_thread *tid))
 {
     rt_scheduler_switch_hook = hook;
 }
@@ -192,7 +192,7 @@ static struct rt_thread* _scheduler_get_highest_priority_thread(rt_ubase_t *high
 /**
  * @brief This function will initialize the system scheduler.
  */
-void rt_system_scheduler_init(void)
+static void _mp_system_scheduler_init(void)
 {
     int cpu;
     rt_base_t offset;
@@ -240,20 +240,6 @@ void rt_system_scheduler_init(void)
  */
 
 /**@{*/
-
-/**
- * @brief This function will handle IPI interrupt and do a scheduling in system.
- *
- * @param vector is the number of IPI interrupt for system scheduling.
- *
- * @param param is not used, and can be set to RT_NULL.
- *
- * @note this function should be invoke or register as ISR in BSP.
- */
-void rt_scheduler_ipi_handler(int vector, void *param)
-{
-    rt_schedule();
-}
 
 static void _rt_schedule_insert_thread(struct rt_thread *thread, rt_bool_t is_lock)
 {
@@ -422,7 +408,7 @@ static void _rt_schedule_remove_thread(struct rt_thread *thread, rt_bool_t is_lo
  * @brief This function will startup the scheduler. It will select one thread
  *        with the highest priority level, then switch to it.
  */
-void rt_system_scheduler_start(void)
+static void _mp_system_scheduler_start(void)
 {
     struct rt_thread *to_thread;
     rt_ubase_t highest_ready_priority;
@@ -453,7 +439,7 @@ void rt_system_scheduler_start(void)
  *        with the highest priority level in global ready queue or local ready queue,
  *        then switch to it.
  */
-void rt_schedule(void)
+static void _mp_schedule(void)
 {
     rt_base_t        level;
     struct rt_thread *to_thread;
@@ -608,7 +594,7 @@ __exit:
  *        it will select one thread with the highest priority level, and then switch
  *        to it.
  */
-void rt_scheduler_do_irq_switch(void *context)
+static void _mp_scheduler_do_irq_switch(void *context)
 {
     int              cpu_id;
     rt_base_t        level;
@@ -736,7 +722,7 @@ void rt_scheduler_do_irq_switch(void *context)
  *
  * @note  Please do not invoke this function in user application.
  */
-void rt_schedule_insert_thread(struct rt_thread *thread)
+static void _mp_schedule_insert_thread(struct rt_thread *thread)
 {
     rt_base_t level;
     level = rt_spin_lock_irqsave(&_spinlock);
@@ -751,7 +737,7 @@ void rt_schedule_insert_thread(struct rt_thread *thread)
  *
  * @note  Please do not invoke this function in user application.
  */
-void rt_schedule_remove_thread(struct rt_thread *thread)
+static void _mp_schedule_remove_thread(struct rt_thread *thread)
 {
     rt_base_t level;
     level = rt_spin_lock_irqsave(&_spinlock);
@@ -764,7 +750,7 @@ void rt_schedule_remove_thread(struct rt_thread *thread)
 /**
  * @brief This function will lock the thread scheduler.
  */
-void rt_enter_critical(void)
+static void _mp_enter_critical(void)
 {
     rt_base_t level;
     struct rt_thread *current_thread;
@@ -785,12 +771,11 @@ void rt_enter_critical(void)
     /* enable interrupt */
     rt_hw_local_irq_enable(level);
 }
-RTM_EXPORT(rt_enter_critical);
 
 /**
  * @brief This function will unlock the thread scheduler.
  */
-void rt_exit_critical(void)
+static void _mp_exit_critical(void)
 {
     rt_base_t level;
     struct rt_thread *current_thread;
@@ -813,7 +798,7 @@ void rt_exit_critical(void)
         /* enable interrupt */
         rt_hw_local_irq_enable(level);
 
-        rt_schedule();
+        _mp_schedule();
     }
     else
     {
@@ -821,19 +806,33 @@ void rt_exit_critical(void)
         rt_hw_local_irq_enable(level);
     }
 }
-RTM_EXPORT(rt_exit_critical);
 
 /**
  * @brief Get the scheduler lock level.
  *
  * @return the level of the scheduler lock. 0 means unlocked.
  */
-rt_uint16_t rt_critical_level(void)
+rt_uint16_t _mp_critical_level(void)
 {
     struct rt_thread *current_thread = rt_cpu_self()->current_thread;
     return rt_atomic_load(&(current_thread->critical_lock_nest));
 }
-RTM_EXPORT(rt_critical_level);
 
 /**@}*/
 /**@endcond*/
+
+struct rt_scheduler rt_mp_scheduler_ops = {
+#if defined(RT_USING_HOOK) && defined(RT_HOOK_USING_FUNC_PTR)
+    .sethook         = _mp_scheduler_sethook,
+    .switch_sethook  = _mp_scheduler_switch_sethook,
+#endif
+    .init            = _mp_system_scheduler_init,
+    .start           = _mp_system_scheduler_start,
+    .schedule        = _mp_schedule,
+    .schedule_do_irq = _mp_scheduler_do_irq_switch,
+    .insert_thread   = _mp_schedule_insert_thread,
+    .remove_thread   = _mp_schedule_remove_thread,
+    .enter_critical  = _mp_enter_critical,
+    .exit_critical   = _mp_exit_critical,
+    .critical_level  = _mp_critical_level
+};

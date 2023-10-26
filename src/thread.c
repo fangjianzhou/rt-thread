@@ -299,6 +299,10 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     rt_atomic_store(&thread->ref_count, 0);
     rt_spin_lock_init(&thread->spinlock);
 
+#ifdef RT_USING_SCHEDULER_EXT
+    rt_scheduler_ext_init(thread);
+#endif
+
     RT_OBJECT_HOOK_CALL(rt_thread_inited_hook, (thread));
 
     return RT_EOK;

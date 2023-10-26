@@ -129,6 +129,7 @@ static struct rt_mutex vlan_mutex;
 #include "lwip/init.h"
 #include "lwip/netdb.h"
 #include <netdev.h>
+#include <lwip/netif.h>
 
 static int lwip_netdev_set_up(struct netdev *netif)
 {
@@ -1468,6 +1469,189 @@ static int vconfig(int argc, char *argv[])
     return 0;
 }
 MSH_CMD_EXPORT(vconfig, vlan config);
+#endif
+
+#if defined(RT_USING_SMART) && defined(RT_LWIP_SUPPORT_VLAN)
+
+#include <lwp_user_mm.h>
+
+/* Passed in vlan_ioctl_args structure to determine behaviour. */
+enum vlan_ioctl_cmds
+{
+    ADD_VLAN_CMD,
+    DEL_VLAN_CMD,
+    SET_VLAN_INGRESS_PRIORITY_CMD,
+    SET_VLAN_EGRESS_PRIORITY_CMD,
+    GET_VLAN_INGRESS_PRIORITY_CMD,
+    GET_VLAN_EGRESS_PRIORITY_CMD,
+    SET_VLAN_NAME_TYPE_CMD,
+    SET_VLAN_FLAG_CMD,
+    GET_VLAN_REALDEV_NAME_CMD, /* If this works, you know it's a VLAN device, btw */
+    GET_VLAN_VID_CMD /* Get the VID of this VLAN (specified by name) */
+};
+
+struct vlan_ioctl_args
+{
+    int cmd; /* Should be one of the vlan_ioctl_cmds enum above. */
+    char device1[24];
+
+    union
+    {
+        char device2[24];
+        int VID;
+        unsigned int skb_priority;
+        unsigned int name_type;
+        unsigned int bind_type;
+        unsigned int flag; /* Matches vlan_dev_info flags */
+    } u;
+
+    short vlan_qos;
+};
+
+/*
+ *	VLAN IOCTL handler.
+ *	o execute requested action or pass command to the device driver
+ *   arg is really a struct vlan_ioctl_args __user *.
+ */
+int vlan_ioctl_handler(void *arg)
+{
+    int err;
+    struct vlan_ioctl_args args;
+    struct eth_device *eth_dev = RT_NULL;
+    struct eth_device *vlan_dev = RT_NULL;
+    char eth_name[RT_NAME_MAX], vlan_name[RT_NAME_MAX];
+    struct ip4_addr ipaddr, netmask, gw;
+
+    if (!lwp_user_accessable((void *)arg, sizeof(args)))
+    {
+        rt_set_errno(-EFAULT);
+        return -EFAULT;
+    }
+
+    lwp_get_from_user(&args, arg, sizeof(args));
+
+    /* Null terminate this sucker, just in case. */
+    args.device1[sizeof(args.device1) - 1] = 0;
+    args.u.device2[sizeof(args.u.device2) - 1] = 0;
+
+    switch (args.cmd)
+    {
+    case SET_VLAN_INGRESS_PRIORITY_CMD:
+        err = -EPERM;
+        break;
+
+    case SET_VLAN_EGRESS_PRIORITY_CMD:
+        err = -EPERM;
+        break;
+
+    case SET_VLAN_FLAG_CMD:
+        err = -EPERM;
+        break;
+
+    case SET_VLAN_NAME_TYPE_CMD:
+        err = -EPERM;
+        break;
+
+    case ADD_VLAN_CMD:
+        err = -EPERM;
+        /* Check if the physical network card is a virtual network card */
+        eth_dev = (struct eth_device *)rt_device_find(args.device1);
+        if (eth_dev && VLAN_ID_IS_VALID(eth_dev->netif))
+        {
+            rt_snprintf(eth_name,
+                rt_strlen(eth_dev->phy_node->netif->name) < RT_NAME_MAX ? rt_strlen(eth_dev->phy_node->netif->name) : RT_NAME_MAX,
+                "%s\n", eth_dev->phy_node->netif->name);
+        }
+        else if (eth_dev)
+        {
+            rt_snprintf(eth_name, RT_NAME_MAX, "%s", args.device1);
+        }
+        else
+        {
+            rt_kprintf("Cannot find device \"%s\".\n", args.device1);
+            err = -ENODEV;
+            goto out;
+        }
+
+        rt_snprintf(vlan_name, RT_NAME_MAX, "%s.%d", eth_name, args.u.VID);
+
+        /* Check if the virtual network card exists */
+        vlan_dev = (struct eth_device *)rt_device_find(vlan_name);
+        if (vlan_dev)
+        {
+            rt_kprintf("The vlan device \"%s\" already exists.\n", vlan_name);
+            goto out;
+        }
+
+        /* Check if the vlan ID exists */
+        if (virtual_eth_id_is_exists(args.u.VID))
+        {
+            rt_kprintf("The vlan id %d already exists.\n", args.u.VID);
+            goto out;
+        }
+
+        /* Create a virtual network card */
+        vlan_dev = virtual_eth_device_create(eth_name, args.u.VID, vlan_name);
+        if (vlan_dev == RT_NULL)
+        {
+            rt_kprintf("Add \"%s\" vlan device failed.\n", vlan_name);
+            goto out;
+        }
+
+        /*ipaddr.addr = inet_addr("127.0.0.1");
+        gw.addr = inet_addr("0.0.0.0");
+        netmask.addr = inet_addr("127.0.0.1");
+        netifapi_netif_set_addr(vlan_dev->netif, &ipaddr, &netmask, &gw);*/
+
+        /* Enable virtual network card based on physical network card status */
+        if (netdev_is_link_up(vlan_dev->phy_node->netif))
+        {
+            eth_device_linkchange(vlan_dev, RT_TRUE);
+        }
+
+        err = 0;
+        break;
+
+    case DEL_VLAN_CMD:
+        err = -EPERM;
+        eth_dev = (struct eth_device *)rt_device_find(args.device1);
+        if (eth_dev)
+        {
+            if (VLAN_ID_IS_VALID(eth_dev->netif))
+            {
+                virtual_eth_device_delete(args.device1);
+            }
+            else
+            {
+                rt_kprintf("The \"%s\" is not a vlan device.\n", args.device1);
+                goto out;
+            }
+        }
+        else
+        {
+            rt_kprintf("Cannot find device \"%s\".\n", args.device1);
+            err = -ENODEV;
+            goto out;
+        }
+        err = 0;
+        break;
+
+    case GET_VLAN_REALDEV_NAME_CMD:
+        err = -EFAULT;
+        break;
+
+    case GET_VLAN_VID_CMD:
+        err = -EFAULT;
+        break;
+
+    default:
+        err = -EOPNOTSUPP;
+        break;
+    }
+out:
+    return err;
+}
+
 #endif
 
 void list_if(void)

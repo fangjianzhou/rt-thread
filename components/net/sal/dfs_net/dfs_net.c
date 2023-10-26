@@ -17,6 +17,13 @@
 #include <dfs_net.h>
 
 #include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <sal_low_lvl.h>
+
+#ifdef RT_USING_SMART
+#include <lwp_user_mm.h>
+#include <lwp_sys_socket.h>
+#endif
 
 int dfs_net_getsocket(int fd)
 {
@@ -34,8 +41,72 @@ int dfs_net_getsocket(int fd)
 
 static int dfs_net_ioctl(struct dfs_file* file, int cmd, void* args)
 {
-    int ret;
+    int ret = -1;
     int socket = (int)(size_t)file->vnode->data;
+
+#ifdef RT_USING_SMART
+    switch (cmd)
+    {
+    case SIOCADDRT:
+    {
+        struct sal_socket *sock = sal_get_socket(socket);
+        if (sock && args)
+        {
+            struct musl_rtentry rt;
+
+            if (!lwp_user_accessable((void *)args, sizeof(rt)))
+            {
+                rt_set_errno(-EFAULT);
+                return ret;
+            }
+
+            lwp_get_from_user(&rt, args, sizeof(rt));
+
+            if (rt.rt_dev && sock->domain == AF_INET)
+            {
+                extern int route_ipv4_add(char *ifname, char *ip_addr, char *nm_addr);
+                return route_ipv4_add(rt.rt_dev, &(rt.rt_dst.sa_data[2]), &(rt.rt_genmask.sa_data[2]));
+            }
+        }
+    }
+    break;
+    case SIOCDELRT:
+    {
+        struct sal_socket *sock = sal_get_socket(socket);
+        if (sock && args)
+        {
+            struct musl_rtentry rt;
+
+            if (!lwp_user_accessable((void *)args, sizeof(rt)))
+            {
+                rt_set_errno(-EFAULT);
+                return ret;
+            }
+
+            lwp_get_from_user(&rt, args, sizeof(rt));
+
+            if (rt.rt_dev && sock->domain == AF_INET)
+            {
+                extern int route_ipv4_delete(char *ip_addr, char *nm_addr);
+                return route_ipv4_delete(&(rt.rt_dst.sa_data[2]), &(rt.rt_genmask.sa_data[2]));
+            }
+        }
+    }
+    break;
+#ifdef  RT_LWIP_SUPPORT_VLAN
+#define SIOCSIFVLAN           0x8983  /* Set 802.1Q VLAN options */
+    case SIOCSIFVLAN:
+    {
+        extern int vlan_ioctl_handler(void *arg);
+        if (args)
+        {
+            return vlan_ioctl_handler(args);
+        }
+    }
+    break;
+#endif
+    }
+#endif
 
     ret = sal_ioctlsocket(socket, cmd, args);
     if (ret < 0)

@@ -107,7 +107,12 @@ route_ip4_add(ip4_addr_t *ip_addr, ip4_addr_t *netmask, struct netif *inp)
     if((ip_addr == NULL) || (inp ==NULL)) {
         return ERR_VAL;
     }
-    
+
+    if (route_ip4_find(ip_addr))
+    {
+        return ERR_VAL;
+    }
+
     rt_node = (struct route_node *)mem_malloc(sizeof(struct route_node));
     
     LWIP_ERROR("rt_node != NULL", (rt_node != NULL), return ERR_MEM;);
@@ -207,6 +212,8 @@ inet_findroute()
 {
     struct route_node *rt_node;
 
+    rt_kprintf("Destination     Gateway         Genmask         Iface\n");
+
     for(rt_node=route_list; rt_node!=NULL; rt_node=rt_node->next) {
         /** If this is not a ipv4 route list. */
         if(rt_node->netmask.addr == 0) {
@@ -215,11 +222,36 @@ inet_findroute()
 #endif
             continue;
         } else {
-            rt_kprintf("ip4_addr:%s\n", ip4addr_ntoa(&rt_node->ip_addr));
+            rt_kprintf("%-16s", ip4addr_ntoa(&rt_node->ip_addr));
+            rt_kprintf("%-16s", "*");
+            rt_kprintf("%-16s", ip4addr_ntoa(&rt_node->netmask));
+            rt_kprintf("%s\n", rt_node->netif->name);
         }
     }
     return ERR_OK;
 }
+
+int inet_route_foreach(void (*func)(const char *name, uint32_t ip_addr, uint32_t netmask, void *parameter), void *parameter)
+{
+    struct route_node *rt_node;
+
+    for (rt_node = route_list; rt_node != NULL; rt_node = rt_node->next)
+    {
+        /** If this is not a ipv4 route list. */
+        if (rt_node->netmask.addr == 0)
+        {
+#if LWIP_IPV6
+            //todo
+#endif
+        }
+        else if (func)
+        {
+            func(rt_node->netif->name, rt_node->ip_addr.addr, rt_node->netmask.addr, parameter);
+        }
+    }
+    return 0;
+}
+
 #endif
 
 #if LWIP_IPV6

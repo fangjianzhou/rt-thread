@@ -9,6 +9,8 @@
 
 /* [LWIPROUTE_ROUTE_0515] */
 #if LWIP_IPV4
+#include "lwip/ip_addr.h"
+
 /*********************************************************
 **   function name:         route4_add
 **   Descriptions:          设置一个naptpt接口
@@ -36,6 +38,25 @@ int route4_add(char* ifname, char* ip_addr, char* nm_addr)
     return 0;
 }
 
+int route_ipv4_add(char *ifname, char *ip_addr, char *nm_addr)
+{
+    ip4_addr_t ip4_address;
+    ip4_addr_t ip4_netmask;
+    struct netif *pnetif;
+
+    pnetif = netif_find((char *)ifname);
+    if (pnetif == RT_NULL)
+    {
+        rt_kprintf("Can find network '%s' interface! \n", ifname);
+        return -1;
+    }
+
+    IP4_ADDR(&ip4_address, ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]);
+    IP4_ADDR(&ip4_netmask, nm_addr[0], nm_addr[1], nm_addr[2], nm_addr[3]);
+
+    return route_ip4_add(&ip4_address, &ip4_netmask, pnetif);
+}
+
 /*********************************************************
 **   function name:         route4_delete
 **   Descriptions:          删除IPv4路由表
@@ -56,6 +77,18 @@ int route4_delete(char* ip_addr, char* nm_addr)
     route_ip4_delete(&ip4_address, &ip4_netmask);
     return 0;
 }
+
+int route_ipv4_delete(char *ip_addr, char *nm_addr)
+{
+    ip4_addr_t ip4_address;
+    ip4_addr_t ip4_netmask;
+
+    IP4_ADDR(&ip4_address, ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]);
+    IP4_ADDR(&ip4_netmask, nm_addr[0], nm_addr[1], nm_addr[2], nm_addr[3]);
+
+    return route_ip4_delete(&ip4_address, &ip4_netmask);
+}
+
 #endif
 
 #if LWIP_IPV6
@@ -228,7 +261,6 @@ int inet_setroute(int action, char **args)
 #ifdef RT_USING_FINSH
 #include <finsh.h>
 
-FINSH_FUNCTION_EXPORT(route, route network host);
 /*
  * If no argument is specified, display the route information;
  * If there are 3 arguments, mount the filesystem.

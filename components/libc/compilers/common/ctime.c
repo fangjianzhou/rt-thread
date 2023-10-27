@@ -899,7 +899,7 @@ static void rtthread_timer_wrapper(void *timerobj)
 #endif /* RT_USING_SMART */
 }
 
-#define TIMER_ID_MAX 50
+#define TIMER_ID_MAX 5120
 static struct rt_spinlock _timer_id_lock = RT_SPINLOCK_INIT;
 static struct timer_obj *_g_timerid[TIMER_ID_MAX];
 static void *timer_id[TIMER_ID_MAX];

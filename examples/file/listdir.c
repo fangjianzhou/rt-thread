@@ -44,7 +44,7 @@ void list_dir(const char* path)
             rt_sprintf(fullpath, "%s/%s", path, dirent->d_name);
 
             stat(fullpath, &s);
-            if ( s.st_mode & S_IFDIR )
+            if (S_ISDIR(s.st_mode))
             {
                 rt_kprintf("%s\t\t<DIR>\n", dirent->d_name);
             }

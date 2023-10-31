@@ -4721,6 +4721,10 @@ sysret_t sys_gethostbyname2_r(const char *name, int af, struct hostent *ret,
 #endif
         ret_val = 0;
     }
+    else
+    {
+        SET_ERRNO(EINVAL);
+    }
 
 __exit:
     if (ret_val < 0)

@@ -1,0 +1,8 @@
+menu "LwP Testcases"
+
+    config UTEST_LWP_TC
+    bool "Enable Utest for lwp"
+    depends on RT_USING_SMART
+    default n
+
+endmenu

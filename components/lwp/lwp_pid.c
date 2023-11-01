@@ -398,7 +398,7 @@ rt_lwp_t lwp_create(rt_base_t flags)
                 lwp_user_object_lock_destroy(new_lwp);
                 rt_free(new_lwp);
                 new_lwp = RT_NULL;
-                LOG_E("pid slot fulled!\n");
+                LOG_E("%s: pid slot fulled", __func__);
             }
             else
             {

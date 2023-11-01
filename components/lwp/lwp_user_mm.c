@@ -159,9 +159,9 @@ void lwp_aspace_switch(struct rt_thread *thread)
 
 void lwp_unmap_user_space(struct rt_lwp *lwp)
 {
-    arch_user_space_free(lwp);
+    if (lwp->aspace)
+        arch_user_space_free(lwp);
 }
-
 
 static void *_lwp_map_user(struct rt_lwp *lwp, void *map_va, size_t map_size,
                            int text)

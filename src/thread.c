@@ -33,6 +33,7 @@
  * 2022-01-24     THEWON       let rt_thread_sleep return thread->error when using signal
  * 2022-10-15     Bernard      add nested mutex feature
  * 2023-09-15     xqyjlj       perf rt_hw_interrupt_disable/enable
+ * 2023-11-01     xqyjlj       use rt_raw_spinlock
  */
 
 #include <rthw.h>
@@ -103,10 +104,10 @@ static void _thread_exit(void)
     thread = rt_thread_self();
     rt_get_thread_struct(thread);
     rt_thread_defunct_enqueue(thread);
-    level = rt_spin_lock_irqsave(&(thread->spinlock));
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
     rt_timer_detach(&thread->thread_timer);
     /* insert to defunct thread list */
-    rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
     LOG_D("line:%d thread:%s exit\n",__LINE__,rt_thread_self()->parent.name);
     rt_put_thread_struct(thread);
     thread->stat = RT_THREAD_CLOSE;
@@ -131,13 +132,13 @@ static void _thread_timeout(void *parameter)
     RT_ASSERT(thread != RT_NULL);
     RT_ASSERT((thread->stat & RT_THREAD_SUSPEND_MASK) == RT_THREAD_SUSPEND_MASK);
     RT_ASSERT(rt_object_get_type((rt_object_t)thread) == RT_Object_Class_Thread);
-    level = rt_spin_lock_irqsave(&(thread->spinlock));
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
     /* set error number */
     thread->error = -RT_ETIMEOUT;
 
     /* remove from suspend list */
     rt_list_remove(&(thread->tlist));
-    rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
     /* insert to schedule ready list */
     rt_schedule_insert_thread(thread);
     /* do schedule */
@@ -455,7 +456,7 @@ rt_err_t rt_thread_detach(rt_thread_t thread)
     }
 
     /* disable interrupt */
-    level = rt_spin_lock_irqsave(&(thread->spinlock));
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
 
     /* release thread timer */
     rt_timer_detach(&(thread->thread_timer));
@@ -473,7 +474,7 @@ rt_err_t rt_thread_detach(rt_thread_t thread)
         thread->pending_object = RT_NULL;
     }
 #endif
-    rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
 
     /* insert to defunct thread list */
     rt_thread_defunct_enqueue(thread);
@@ -565,7 +566,7 @@ rt_err_t rt_thread_delete(rt_thread_t thread)
         /* remove from schedule */
         rt_schedule_remove_thread(thread);
     }
-    level = rt_spin_lock_irqsave(&(thread->spinlock));
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
 
     /* release thread timer */
     rt_timer_detach(&(thread->thread_timer));
@@ -583,7 +584,7 @@ rt_err_t rt_thread_delete(rt_thread_t thread)
         thread->pending_object = RT_NULL;
     }
 #endif
-    rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
     /* insert to defunct thread list */
     rt_thread_defunct_enqueue(thread);
 
@@ -606,10 +607,10 @@ rt_err_t rt_thread_yield(void)
     rt_base_t level;
 
     thread = rt_thread_self();
-    level = rt_spin_lock_irqsave(&(thread->spinlock));
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
     rt_atomic_store(&thread->remaining_tick, thread->init_tick);
     thread->stat |= RT_THREAD_STAT_YIELD;
-    rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
     rt_schedule();
 
     return RT_EOK;
@@ -648,7 +649,7 @@ rt_err_t rt_thread_sleep(rt_tick_t tick)
     level_local = rt_hw_local_irq_disable();
     /* suspend thread */
     err = rt_thread_suspend_with_flag(thread, RT_INTERRUPTIBLE);
-    level = rt_spin_lock_irqsave(&(thread->spinlock));
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
     /* reset the timeout of thread timer and start it */
     if (err == RT_EOK)
     {
@@ -656,7 +657,7 @@ rt_err_t rt_thread_sleep(rt_tick_t tick)
         rt_timer_start(&(thread->thread_timer));
 
         /* enable interrupt */
-        rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+        rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
         rt_hw_local_irq_enable(level_local);
         thread->error = -RT_EINTR;
 
@@ -668,7 +669,7 @@ rt_err_t rt_thread_sleep(rt_tick_t tick)
     }
     else
     {
-        rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+        rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
         rt_hw_local_irq_enable(level_local);
     }
 
@@ -713,7 +714,7 @@ rt_err_t rt_thread_delay_until(rt_tick_t *tick, rt_tick_t inc_tick)
     RT_ASSERT(rt_object_get_type((rt_object_t)thread) == RT_Object_Class_Thread);
 
     /* disable interrupt */
-    level = rt_spin_lock_irqsave(&(thread->spinlock));
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
 
     /* reset thread error */
     thread->error = RT_EOK;
@@ -725,14 +726,14 @@ rt_err_t rt_thread_delay_until(rt_tick_t *tick, rt_tick_t inc_tick)
 
         *tick += inc_tick;
         left_tick = *tick - cur_tick;
-        rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+        rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
         /* suspend thread */
         rt_thread_suspend_with_flag(thread, RT_UNINTERRUPTIBLE);
-        level = rt_spin_lock_irqsave(&(thread->spinlock));
+        level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
         /* reset the timeout of thread timer and start it */
         rt_timer_control(&(thread->thread_timer), RT_TIMER_CTRL_SET_TIME, &left_tick);
         rt_timer_start(&(thread->thread_timer));
-        rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+        rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
 
         rt_schedule();
 
@@ -745,7 +746,7 @@ rt_err_t rt_thread_delay_until(rt_tick_t *tick, rt_tick_t inc_tick)
     else
     {
         *tick = cur_tick;
-        rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+        rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
     }
 
     return thread->error;
@@ -796,7 +797,7 @@ static void rt_thread_cpu_bind(rt_thread_t thread, int cpu)
     }
     else
     {
-        level = rt_spin_lock_irqsave(&(thread->spinlock));
+        level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
         thread->bind_cpu = cpu;
         if ((thread->stat & RT_THREAD_STAT_MASK) == RT_THREAD_RUNNING)
         {
@@ -813,9 +814,9 @@ static void rt_thread_cpu_bind(rt_thread_t thread, int cpu)
                         /* bind to other cpu */
                         rt_hw_ipi_send(RT_SCHEDULE_IPI, 1U << cpu);
                         /* self cpu need reschedule */
-                        rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+                        rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
                         rt_schedule();
-                        level = rt_spin_lock_irqsave(&(thread->spinlock));
+                        level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
                     }
                     /* else do nothing */
                 }
@@ -827,7 +828,7 @@ static void rt_thread_cpu_bind(rt_thread_t thread, int cpu)
             }
             /* else do nothing */
         }
-        rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+        rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
     }
 }
 #endif
@@ -869,7 +870,7 @@ rt_err_t rt_thread_control(rt_thread_t thread, int cmd, void *arg)
             {
                 /* remove thread from schedule queue first */
                 rt_schedule_remove_thread(thread);
-                level = rt_spin_lock_irqsave(&(thread->spinlock));
+                level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
                 /* change thread priority */
                 thread->current_priority = *(rt_uint8_t *)arg;
 
@@ -882,13 +883,13 @@ rt_err_t rt_thread_control(rt_thread_t thread, int cmd, void *arg)
                 thread->number_mask = 1 << thread->current_priority;
     #endif /* RT_THREAD_PRIORITY_MAX > 32 */
                 thread->stat  = RT_THREAD_INIT;
-                rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+                rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
                 /* insert thread to schedule queue again */
                 rt_schedule_insert_thread(thread);
             }
             else
             {
-                level = rt_spin_lock_irqsave(&(thread->spinlock));
+                level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
                 thread->current_priority = *(rt_uint8_t *)arg;
 
                 /* recalculate priority attribute */
@@ -899,7 +900,7 @@ rt_err_t rt_thread_control(rt_thread_t thread, int cmd, void *arg)
     #else
                 thread->number_mask = 1 << thread->current_priority;
     #endif /* RT_THREAD_PRIORITY_MAX > 32 */
-                rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+                rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
             }
             break;
         }
@@ -1000,13 +1001,13 @@ rt_err_t rt_thread_suspend_with_flag(rt_thread_t thread, int suspend_flag)
 
     LOG_D("thread suspend:  %s", thread->parent.name);
 
-    level = rt_spin_lock_irqsave(&(thread->spinlock));
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
 
     stat = thread->stat & RT_THREAD_STAT_MASK;
     if ((stat != RT_THREAD_READY) && (stat != RT_THREAD_RUNNING))
     {
         LOG_D("thread suspend: thread disorder, 0x%2x", thread->stat);
-        rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+        rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
         return -RT_ERROR;
     }
 
@@ -1019,20 +1020,20 @@ rt_err_t rt_thread_suspend_with_flag(rt_thread_t thread, int suspend_flag)
     if (lwp_thread_signal_suspend_check(thread, suspend_flag) == 0)
     {
         /* not to suspend */
-        rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+        rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
         return -RT_EINTR;
     }
 #endif
 
-    rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
     rt_schedule_remove_thread(thread);
-    level = rt_spin_lock_irqsave(&(thread->spinlock));
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
 
     rt_thread_set_suspend_state(thread, suspend_flag);
 
     /* stop thread timer anyway */
     rt_timer_stop(&(thread->thread_timer));
-    rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
 
     RT_OBJECT_HOOK_CALL(rt_thread_suspend_hook, (thread));
     return RT_EOK;
@@ -1071,7 +1072,7 @@ rt_err_t rt_thread_resume(rt_thread_t thread)
         return -RT_ERROR;
     }
 
-    level = rt_spin_lock_irqsave(&(thread->spinlock)); //TODO need lock for cpu
+    level = rt_raw_spin_lock_irqsave(&(thread->spinlock)); //TODO need lock for cpu
 
     /* remove from suspend list */
     rt_list_remove(&(thread->tlist));
@@ -1082,7 +1083,7 @@ rt_err_t rt_thread_resume(rt_thread_t thread)
     thread->wakeup.func = RT_NULL;
 #endif
 
-    rt_spin_unlock_irqrestore(&(thread->spinlock), level);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
     /* insert to schedule ready list */
     rt_schedule_insert_thread(thread);
 
@@ -1107,10 +1108,10 @@ rt_err_t rt_thread_wakeup(rt_thread_t thread)
 
     RT_ASSERT(thread != RT_NULL);
     RT_ASSERT(rt_object_get_type((rt_object_t)thread) == RT_Object_Class_Thread);
-    temp = rt_spin_lock_irqsave(&(thread->spinlock));
+    temp = rt_raw_spin_lock_irqsave(&(thread->spinlock));
     func = thread->wakeup.func;
     thread->wakeup.func = RT_NULL;
-    rt_spin_unlock_irqrestore(&(thread->spinlock), temp);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), temp);
     if (func)
     {
         ret = func(thread->wakeup.user_data, thread);
@@ -1130,10 +1131,10 @@ void rt_thread_wakeup_set(struct rt_thread *thread, rt_wakeup_func_t func, void*
     RT_ASSERT(thread != RT_NULL);
     RT_ASSERT(rt_object_get_type((rt_object_t)thread) == RT_Object_Class_Thread);
 
-    temp = rt_spin_lock_irqsave(&(thread->spinlock));
+    temp = rt_raw_spin_lock_irqsave(&(thread->spinlock));
     thread->wakeup.func = func;
     thread->wakeup.user_data = user_data;
-    rt_spin_unlock_irqrestore(&(thread->spinlock), temp);
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), temp);
 }
 RTM_EXPORT(rt_thread_wakeup_set);
 #endif

@@ -10,34 +10,63 @@
  *                             Coding style: remove multiple `return` in a routine
  * 2023-08-08     Shell        Fix return value of futex(wait); Fix ops that only
  *                             FUTEX_PRIVATE is supported currently
+ * 2023-11-03     Shell        Add Support for ~FUTEX_PRIVATE
  */
-#define DBG_TAG "lwp.futex"
-#define DBG_LVL DBG_INFO
-#include <rtdbg.h>
 
-#include "lwp_internal.h"
-#include "lwp_pid.h"
-
-#include <rtthread.h>
-#include <lwp.h>
-#ifdef ARCH_MM_MMU
-#include <lwp_user_mm.h>
-#endif
+#include "lwp_futex_internal.h"
 #include "sys/time.h"
 
-struct rt_futex
-{
-    int *uaddr;
-    rt_list_t waiting_thread;
-    struct lwp_avl_struct node;
-    struct rt_object *custom_obj;
-};
+struct rt_mutex _glob_futex;
 
-/* must have futex address_search_head taken */
-static rt_err_t _futex_destroy_locked(void *data)
+rt_err_t lwp_futex_init(void)
+{
+    return rt_mutex_init(&_glob_futex, "glob_ftx", RT_IPC_FLAG_PRIO);
+}
+
+static void _futex_lock(rt_lwp_t lwp, int op_flags)
+{
+    rt_err_t error;
+    if (op_flags & FUTEX_PRIVATE)
+    {
+        LWP_LOCK(lwp);
+    }
+    else
+    {
+        error = lwp_mutex_take_safe(&_glob_futex, RT_WAITING_FOREVER, 0);
+        if (error)
+        {
+            LOG_E("%s: Should not failed", __func__);
+            RT_ASSERT(0);
+        }
+    }
+}
+
+static void _futex_unlock(rt_lwp_t lwp, int op_flags)
+{
+    rt_err_t error;
+    if (op_flags & FUTEX_PRIVATE)
+    {
+        LWP_UNLOCK(lwp);
+    }
+    else
+    {
+        error = lwp_mutex_release_safe(&_glob_futex);
+        if (error)
+        {
+            LOG_E("%s: Should not failed", __func__);
+            RT_ASSERT(0);
+        }
+    }
+}
+
+/**
+ * Destroy a Private FuTeX (pftx)
+ * Note: must have futex address_search_head taken
+ */
+static rt_err_t _pftx_destroy_locked(void *data)
 {
     rt_err_t ret = -1;
-    struct rt_futex *futex = (struct rt_futex *)data;
+    rt_futex_t futex = (rt_futex_t)data;
 
     if (futex)
     {
@@ -59,10 +88,13 @@ static rt_err_t _futex_destroy_locked(void *data)
     return ret;
 }
 
-/* must have futex address_search_head taken */
-static struct rt_futex *_futex_create_locked(int *uaddr, struct rt_lwp *lwp)
+/**
+ * Create a Private FuTeX (pftx)
+ * Note: must have futex address_search_head taken
+ */
+static rt_futex_t _pftx_create_locked(int *uaddr, struct rt_lwp *lwp)
 {
-    struct rt_futex *futex = RT_NULL;
+    rt_futex_t futex = RT_NULL;
     struct rt_object *obj = RT_NULL;
 
     /**
@@ -73,10 +105,11 @@ static struct rt_futex *_futex_create_locked(int *uaddr, struct rt_lwp *lwp)
      */
     if (lwp)
     {
-        futex = (struct rt_futex *)rt_malloc(sizeof(struct rt_futex));
+        futex = (rt_futex_t)rt_malloc(sizeof(struct rt_futex));
         if (futex)
         {
-            obj = rt_custom_object_create("futex", (void *)futex, _futex_destroy_locked);
+            /* Create a Private FuTeX (pftx) */
+            obj = rt_custom_object_create("pftx", (void *)futex, _pftx_destroy_locked);
             if (!obj)
             {
                 rt_free(futex);
@@ -96,13 +129,13 @@ static struct rt_futex *_futex_create_locked(int *uaddr, struct rt_lwp *lwp)
                  */
                 if (lwp_user_object_add(lwp, obj))
                 {
+                    /* this will call a _pftx_destroy_locked, but that's okay */
                     rt_object_delete(obj);
                     rt_free(futex);
                     futex = RT_NULL;
                 }
                 else
                 {
-                    futex->uaddr = uaddr;
                     futex->node.avl_key = (avl_key_t)uaddr;
                     futex->node.data = &lwp->address_search_head;
                     futex->custom_obj = obj;
@@ -122,29 +155,208 @@ static struct rt_futex *_futex_create_locked(int *uaddr, struct rt_lwp *lwp)
     return futex;
 }
 
-/* must have futex address_search_head taken */
-static struct rt_futex *_futex_get_locked(void *uaddr, struct rt_lwp *lwp)
+/**
+ * Get a Private FuTeX (pftx) match the (lwp, uaddr, op)
+ */
+static rt_futex_t _pftx_get(void *uaddr, struct rt_lwp *lwp, int op, rt_err_t *rc)
 {
-    struct rt_futex *futex = RT_NULL;
     struct lwp_avl_struct *node = RT_NULL;
+    rt_futex_t futex = RT_NULL;
+    rt_err_t error = -1;
+
+    LWP_LOCK(lwp);
 
     /**
      * Note: Critical Section
      * protect lwp address_search_head (READ)
      */
     node = lwp_avl_find((avl_key_t)uaddr, lwp->address_search_head);
-    if (!node)
+    if (node)
     {
-        return RT_NULL;
+        futex = rt_container_of(node, struct rt_futex, node);
+        error = 0;
     }
-    futex = rt_container_of(node, struct rt_futex, node);
+    else
+    {
+        /* create a futex according to this uaddr */
+        futex = _pftx_create_locked(uaddr, lwp);
+
+        if (!futex)
+            error = -ENOMEM;
+        else
+            error = 0;
+    }
+    LWP_UNLOCK(lwp);
+
+    *rc = error;
     return futex;
 }
 
-static int _futex_wait(struct rt_futex *futex, struct rt_lwp *lwp, int value, const struct timespec *timeout)
+/**
+ * Destroy a Shared FuTeX (pftx)
+ * Note: must have futex address_search_head taken
+ */
+static rt_err_t _sftx_destroy(void *data)
 {
+    rt_err_t ret = -1;
+    rt_futex_t futex = (rt_futex_t )data;
+
+    if (futex)
+    {
+        /* delete it even it's not in the table */
+        futex_global_table_delete(&futex->entry.key);
+        rt_free(futex);
+        ret = 0;
+    }
+    return ret;
+}
+
+/**
+ * Create a Shared FuTeX (sftx)
+ */
+static rt_futex_t _sftx_create(struct shared_futex_key *key, struct rt_lwp *lwp)
+{
+    rt_futex_t futex = RT_NULL;
+    struct rt_object *obj = RT_NULL;
+
+    if (lwp)
+    {
+        futex = (rt_futex_t)rt_calloc(1, sizeof(struct rt_futex));
+        if (futex)
+        {
+            /* create a Shared FuTeX (sftx) */
+            obj = rt_custom_object_create("sftx", (void *)futex, _sftx_destroy);
+            if (!obj)
+            {
+                rt_free(futex);
+                futex = RT_NULL;
+            }
+            else
+            {
+                if (futex_global_table_add(key, futex))
+                {
+                    rt_object_delete(obj);
+                    rt_free(futex);
+                    futex = RT_NULL;
+                }
+                else
+                {
+                    rt_list_init(&(futex->waiting_thread));
+                    futex->custom_obj = obj;
+                }
+            }
+        }
+    }
+    return futex;
+}
+
+/**
+ * Get a Shared FuTeX (sftx) match the (lwp, uaddr, op)
+ */
+static rt_futex_t _sftx_get(void *uaddr, struct rt_lwp *lwp, int op, rt_err_t *rc)
+{
+    rt_futex_t futex = RT_NULL;
+    struct shared_futex_key key;
+    rt_varea_t varea;
+    rt_err_t error = -1;
+
+    RD_LOCK(lwp->aspace);
+    varea = rt_aspace_query(lwp->aspace, uaddr);
+    if (varea)
+    {
+        key.mobj = varea->mem_obj;
+        key.offset = varea->offset;
+        RD_UNLOCK(lwp->aspace);
+
+        /* query for the key */
+        error = futex_global_table_find(&key, &futex);
+        if (error != RT_EOK)
+        {
+            /* not found, do allocation */
+            futex = _sftx_create(&key, lwp);
+            if (!futex)
+                error = -ENOMEM;
+            else
+                error = 0;
+        }
+    }
+    else
+    {
+        RD_UNLOCK(lwp->aspace);
+    }
+
+    *rc = error;
+    return futex;
+}
+
+/* must have futex address_search_head taken */
+static rt_futex_t _futex_get(void *uaddr, struct rt_lwp *lwp, int op_flags, rt_err_t *rc)
+{
+    rt_futex_t futex = RT_NULL;
+
+    if (op_flags & FUTEX_PRIVATE)
+    {
+        futex = _pftx_get(uaddr, lwp, op_flags, rc);
+    }
+    else
+    {
+        futex = _sftx_get(uaddr, lwp, op_flags, rc);
+    }
+
+    return futex;
+}
+
+static rt_err_t _suspend_thread_timeout_locked(rt_thread_t thread, rt_futex_t futex, rt_tick_t timeout)
+{
+    rt_err_t rc;
+    rc = rt_thread_suspend_with_flag(thread, RT_INTERRUPTIBLE);
+
+    if (rc == RT_EOK)
+    {
+        /**
+         * Brief: Add current thread into futex waiting thread list
+         *
+         * Note: Critical Section
+         * - the futex waiting_thread list (RW)
+         */
+        rt_list_insert_before(&(futex->waiting_thread), &(thread->tlist));
+
+        /* start the timer of thread */
+        rt_timer_control(&(thread->thread_timer),
+                            RT_TIMER_CTRL_SET_TIME,
+                            &timeout);
+        rt_timer_start(&(thread->thread_timer));
+        rt_set_errno(ETIMEDOUT);
+    }
+
+    return rc;
+}
+
+static rt_err_t _suspend_thread_locked(rt_thread_t thread, rt_futex_t futex)
+{
+    rt_err_t rc;
+    rc = rt_thread_suspend_with_flag(thread, RT_INTERRUPTIBLE);
+
+    if (rc == RT_EOK)
+    {
+        /**
+         * Brief: Add current thread into futex waiting thread list
+         *
+         * Note: Critical Section
+         * - the futex waiting_thread list (RW)
+         */
+        rt_list_insert_before(&(futex->waiting_thread), &(thread->tlist));
+    }
+
+    return rc;
+}
+
+static int _futex_wait(rt_futex_t futex, struct rt_lwp *lwp, int *uaddr,
+                       int value, const struct timespec *timeout, int op_flags)
+{
+    rt_tick_t to;
     rt_thread_t thread;
-    rt_err_t ret = -RT_EINTR;
+    rt_err_t rc = -RT_EINTR;
 
     /**
      * Brief: Remove current thread from scheduler, besides appends it to
@@ -152,85 +364,60 @@ static int _futex_wait(struct rt_futex *futex, struct rt_lwp *lwp, int value, co
      * a timer will be setup for current thread
      *
      * Note: Critical Section
-     * - futex (RW; Protected by lwp_lock)
+     * - futex.waiting (RW; Protected by lwp_lock)
      * - the local cpu
      */
-    LWP_LOCK(lwp);
-    if (*(futex->uaddr) == value)
+    _futex_lock(lwp, op_flags);
+    if (*uaddr == value)
     {
         thread = rt_thread_self();
 
-        rt_enter_critical();
-
-        ret = rt_thread_suspend_with_flag(thread, RT_INTERRUPTIBLE);
-
-        if (ret == RT_EOK)
+        if (timeout)
         {
-            /**
-             * Brief: Add current thread into futex waiting thread list
-             *
-             * Note: Critical Section
-             * - the futex waiting_thread list (RW)
-             */
-            rt_list_insert_before(&(futex->waiting_thread), &(thread->tlist));
+            to = timeout->tv_sec * RT_TICK_PER_SECOND;
+            to += (timeout->tv_nsec * RT_TICK_PER_SECOND) / NANOSECOND_PER_SECOND;
 
-            if (timeout)
+            if (to < 0)
             {
-                /* start the timer of thread */
-                rt_int32_t time = timeout->tv_sec * RT_TICK_PER_SECOND + timeout->tv_nsec * RT_TICK_PER_SECOND / NANOSECOND_PER_SECOND;
-
-                if (time < 0)
-                {
-                    time = 0;
-                }
-
-                rt_timer_control(&(thread->thread_timer),
-                                 RT_TIMER_CTRL_SET_TIME,
-                                 &time);
-                rt_timer_start(&(thread->thread_timer));
+                rc = -EINVAL;
+                _futex_unlock(lwp, op_flags);
+            }
+            else
+            {
+                rt_enter_critical();
+                rc = _suspend_thread_timeout_locked(thread, futex, to);
+                _futex_unlock(lwp, op_flags);
+                rt_exit_critical();
             }
         }
         else
         {
-            ret = EINTR;
+            rt_enter_critical();
+            rc = _suspend_thread_locked(thread, futex);
+            _futex_unlock(lwp, op_flags);
+            rt_exit_critical();
         }
 
-        LWP_UNLOCK(lwp);
-        rt_exit_critical();
-
-        if (ret == RT_EOK)
+        if (rc == RT_EOK)
         {
             /* do schedule */
             rt_schedule();
             /* check errno */
-            ret = rt_get_errno();
-        }
-
-        ret = ret > 0 ? -ret : ret;
-        switch (ret)
-        {
-            case RT_EOK:
-                ret = 0;
-                break;
-            case -RT_EINTR:
-                ret = -EINTR;
-                break;
-            default:
-                ret = -EAGAIN;
-                break;
+            rc = rt_get_errno();
+            rc = rc > 0 ? -rc : rc;
         }
     }
     else
     {
-        LWP_UNLOCK(lwp);
-        ret = -EAGAIN;
+        _futex_unlock(lwp, op_flags);
+        rc = -EAGAIN;
         rt_set_errno(EAGAIN);
     }
 
-    return ret;
+    return rc;
 }
 
-static long _futex_wake(struct rt_futex *futex, struct rt_lwp *lwp, int number)
+static long _futex_wake(rt_futex_t futex, struct rt_lwp *lwp, int number, int op_flags)
 {
     long woken_cnt = 0;
     int is_empty = 0;
@@ -244,7 +431,7 @@ static long _futex_wake(struct rt_futex *futex, struct rt_lwp *lwp, int number)
      */
     while (number && !is_empty)
     {
-        LWP_LOCK(lwp);
+        _futex_lock(lwp, op_flags);
         is_empty = rt_list_isempty(&(futex->waiting_thread));
         if (!is_empty)
         {
@@ -259,7 +446,7 @@ static long _futex_wake(struct rt_futex *futex, struct rt_lwp *lwp, int number)
             number--;
             woken_cnt++;
         }
-        LWP_UNLOCK(lwp);
+        _futex_unlock(lwp, op_flags);
     }
 
     /* do schedule */
@@ -283,12 +470,11 @@ sysret_t sys_futex(int *uaddr, int op, int val, const struct timespec *timeout,
                    int *uaddr2, int val3)
 {
     struct rt_lwp *lwp = RT_NULL;
-    struct rt_futex *futex = RT_NULL;
     sysret_t ret = 0;
 
     if (!lwp_user_accessable(uaddr, sizeof(int)))
     {
-        ret = -EINVAL;
+        ret = -EFAULT;
     }
     else if (timeout && !_timeout_ignored(op) && !lwp_user_accessable((void *)timeout, sizeof(struct timespec)))
     {
@@ -297,55 +483,36 @@ sysret_t sys_futex(int *uaddr, int op, int val, const struct timespec *timeout,
     else
     {
         lwp = lwp_self();
-        ret = lwp_futex(lwp, futex, uaddr, op, val, timeout);
+        ret = lwp_futex(lwp, uaddr, op, val, timeout, uaddr2, val3);
     }
 
     return ret;
 }
 
-rt_err_t lwp_futex(struct rt_lwp *lwp, struct rt_futex *futex, int *uaddr, int op, int val, const struct timespec *timeout)
+#define FUTEX_FLAGS (FUTEX_PRIVATE | FUTEX_CLOCK_REALTIME)
+rt_err_t lwp_futex(struct rt_lwp *lwp, int *uaddr, int op, int val,
+                   const struct timespec *timeout, int *uaddr2, int val3)
 {
+    rt_futex_t futex;
     rt_err_t rc = 0;
+    int op_type = op & ~FUTEX_FLAGS;
+    int op_flags = op & FUTEX_FLAGS;
 
-    /**
-     * Brief: Check if the futex exist, otherwise create a new one
-     *
-     * Note: Critical Section
-     * - lwp address_search_head (READ)
-     */
-    LWP_LOCK(lwp);
-    futex = _futex_get_locked(uaddr, lwp);
-    if (futex == RT_NULL)
-    {
-        /* create a futex according to this uaddr */
-        futex = _futex_create_locked(uaddr, lwp);
-        if (futex == RT_NULL)
-        {
-            rc = -ENOMEM;
-        }
-    }
-    LWP_UNLOCK(lwp);
-
+    futex = _futex_get(uaddr, lwp, op_flags, &rc);
     if (!rc)
     {
-        if (!(op & FUTEX_PRIVATE))
-            rc = -ENOSYS;
-        else
+        switch (op_type)
         {
-            op &= ~FUTEX_PRIVATE;
-            switch (op)
-            {
-                case FUTEX_WAIT:
-                    rc = _futex_wait(futex, lwp, val, timeout);
-                    break;
-                case FUTEX_WAKE:
-                    rc = _futex_wake(futex, lwp, val);
-                    break;
-                default:
-                    LOG_W("User require op=%d which is not implemented", op);
-                    rc = -ENOSYS;
-                    break;
-            }
+            case FUTEX_WAIT:
+                rc = _futex_wait(futex, lwp, uaddr, val, timeout, op_flags);
+                break;
+            case FUTEX_WAKE:
+                rc = _futex_wake(futex, lwp, val, op_flags);
+                break;
+            default:
+                LOG_W("User require op=%d which is not implemented", op);
+                rc = -ENOSYS;
+                break;
         }
     }
 

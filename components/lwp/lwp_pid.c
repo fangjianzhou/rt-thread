@@ -408,6 +408,19 @@ rt_lwp_t lwp_create(rt_base_t flags)
             lwp_pid_lock_release();
         }
         rt_memset(&new_lwp->rt_rusage,0,sizeof(new_lwp->rt_rusage));
+
+        if (flags & LWP_CREATE_FLAG_INIT_USPACE)
+        {
+            rt_err_t error = lwp_user_space_init(new_lwp, 0);
+            if (error)
+            {
+                lwp_pid_put(new_lwp);
+                lwp_user_object_lock_destroy(new_lwp);
+                rt_free(new_lwp);
+                new_lwp = RT_NULL;
+                LOG_E("%s: failed to initialize user space", __func__);
+            }
+        }
     }
 
     LOG_D("%s(pid=%d) => %p", __func__, new_lwp->pid, new_lwp);

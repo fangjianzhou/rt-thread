@@ -212,8 +212,9 @@ int lwp_setaffinity(pid_t pid, int cpu);
 /* ctime lwp API */
 int timer_list_free(rt_list_t *timer_list);
 
-struct rt_futex;
-rt_err_t lwp_futex(struct rt_lwp *lwp, struct rt_futex *futex, int *uaddr, int op, int val, const struct timespec *timeout);
+rt_err_t lwp_futex_init(void);
+rt_err_t lwp_futex(struct rt_lwp *lwp, int *uaddr, int op, int val,
+                   const struct timespec *timeout, int *uaddr2, int val3);
 
 #ifdef ARCH_MM_MMU
 struct __pthread {

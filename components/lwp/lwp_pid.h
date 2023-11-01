@@ -19,6 +19,7 @@ extern "C" {
 
 #define LWP_CREATE_FLAG_NONE        0x0000
 #define LWP_CREATE_FLAG_ALLOC_PID   0x0001  /* allocate pid on lwp object create */
+#define LWP_CREATE_FLAG_INIT_USPACE 0x0002  /* do user space initialization */
 
 struct rt_lwp;
 

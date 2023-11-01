@@ -994,7 +994,7 @@ rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
     _thread_signal_mask(thread, LWP_SIG_MASK_CMD_SET_MASK, &blocked_sigset, &saved_sigset);
     if (timeout)
     {
-        rt_uint32_t time;
+        rt_tick_t time;
         time = rt_timespec_to_tick(timeout);
 
         /**

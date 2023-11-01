@@ -83,6 +83,10 @@ int lwp_component_init(void)
     {
         LOG_E("%s: rt_channel_component_init failed", __func__);
     }
+    else if ((rc = lwp_futex_init()) != RT_EOK)
+    {
+        LOG_E("%s: lwp_futex_init() failed", __func__);
+    }
     return rc;
 }
 INIT_COMPONENT_EXPORT(lwp_component_init);

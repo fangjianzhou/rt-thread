@@ -393,6 +393,18 @@ static int netdev_flags_sync(struct netif *lwip_netif)
     return ERR_OK;
 }
 
+static void add_netdev_lo()
+{
+    struct netdev *netdev = RT_NULL;
+    netdev = rt_malloc(sizeof(struct netdev));
+    memset(netdev, '\0', sizeof(struct netdev));
+    netdev_register(netdev, "lo", RT_NULL);
+    netdev->flags |= NETDEV_FLAG_UP;
+    extern int sal_unix_netdev_set_pf_info(struct netdev *netdev);
+    sal_unix_netdev_set_pf_info(netdev);
+    netdev_lo = netdev;
+}
+
 static int netdev_add(struct netif *lwip_netif)
 {
     int result = 0;
@@ -415,6 +427,11 @@ static int netdev_add(struct netif *lwip_netif)
 
     rt_strncpy(name, lwip_netif->name, NETIF_NAMESIZE);
     result = netdev_register(netdev, name, (void *)lwip_netif);
+
+    if (netdev_lo == RT_NULL)
+    {
+        add_netdev_lo();
+    }
 
     /* Update netdev info after registered */
     netdev_flags_sync(lwip_netif);

@@ -45,6 +45,10 @@ typedef uint32_t socklen_t;
 #define SAL_SOCKET_OFFSET              0
 #endif
 
+struct sockaddr;
+struct msghdr;
+struct addrinfo;
+
 struct sal_socket
 {
     uint32_t magic;                    /* SAL socket magic word */

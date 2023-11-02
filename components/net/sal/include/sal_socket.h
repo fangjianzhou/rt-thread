@@ -120,6 +120,7 @@ typedef uint16_t in_port_t;
 #define MSG_MORE        0x10    /* Sender will send more */
 /* LWIPPTP_SWREQ_0036 */
 #define MSG_ERRQUEUE    0x2000  /* Fetch message from error queue */
+#define MSG_CONFIRM     0x0800  /* Confirm path validity */
 
 /* Options for level IPPROTO_IP */
 #define IP_TOS             1

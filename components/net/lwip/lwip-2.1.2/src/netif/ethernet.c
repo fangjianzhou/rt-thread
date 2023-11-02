@@ -128,7 +128,7 @@ ethernet_input(struct pbuf *p, struct netif *netif)
     /* [LWIPSECA_SWREQ_0799] */
     //TODO mutex ???
     for (netif = netif_list; netif != NULL; netif = netif->next) {
-      if (netif->prio_vid == PP_HTONS(vlan->prio_vid)) {
+      if (netif->prio_vid == VLAN_ID(vlan)) {
         break;
       }
     }

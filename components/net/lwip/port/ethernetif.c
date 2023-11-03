@@ -396,6 +396,7 @@ static int netdev_flags_sync(struct netif *lwip_netif)
 
 static void add_netdev_lo()
 {
+#ifdef RT_USING_DFS_V2
     struct netdev *netdev = RT_NULL;
     netdev = rt_malloc(sizeof(struct netdev));
     memset(netdev, '\0', sizeof(struct netdev));
@@ -404,6 +405,7 @@ static void add_netdev_lo()
     extern int sal_unix_netdev_set_pf_info(struct netdev *netdev);
     sal_unix_netdev_set_pf_info(netdev);
     netdev_lo = netdev;
+#endif
 }
 
 static int netdev_add(struct netif *lwip_netif)

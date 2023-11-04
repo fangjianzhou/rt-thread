@@ -36,6 +36,11 @@
 #include "lwp_user_mm.h"
 #endif
 
+#ifdef RT_USING_DFS_PROCFS
+#include "proc.h"
+#include "procfs.h"
+#endif
+
 #define PID_MAX 10000
 
 #define PID_CT_ASSERT(name, x) \
@@ -143,8 +148,23 @@ static void lwp_pid_put_locked(pid_t pid)
     }
 }
 
+#ifdef RT_USING_DFS_PROCFS
+    rt_inline void _free_proc_dentry(rt_lwp_t lwp)
+    {
+        char pid_str[64] = {0};
+
+        rt_snprintf(pid_str, 64, "%d", lwp->pid);
+        pid_str[63] = 0;
+        proc_remove_dentry(pid_str, 0);
+    }
+#else
+    #define _free_proc_dentry(lwp)
+#endif
+
 void lwp_pid_put(struct rt_lwp *lwp)
 {
+    _free_proc_dentry(lwp);
+
     lwp_pid_lock_take();
     lwp_pid_put_locked(lwp->pid);
     lwp_pid_lock_release();
@@ -164,6 +184,13 @@ static void lwp_pid_set_lwp_locked(pid_t pid, struct rt_lwp *lwp)
     {
         p->data = lwp;
         lwp_ref_inc(lwp);
+
+#ifdef RT_USING_DFS_PROCFS
+        if (pid)
+        {
+            proc_pid(pid);
+        }
+#endif
     }
 }
 
@@ -377,9 +404,6 @@ rt_lwp_t lwp_create(rt_base_t flags)
             {
                 new_lwp->pid = pid;
                 lwp_pid_set_lwp_locked(pid, new_lwp);
-#ifdef RT_USING_DFS_PROCFS
-                proc_pid(pid);
-#endif
             }
             lwp_pid_lock_release();
         }

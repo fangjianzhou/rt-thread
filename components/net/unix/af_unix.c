@@ -17,6 +17,11 @@
 #include <dfs_mnt.h>
 #include <dfs_dentry.h>
 #include <unistd.h>
+#include <rtdef.h>
+#include <netdev.h>
+
+/* The local virtual network device */
+extern struct netdev *netdev_lo;
 
 #define DBG_TAG "af_unix"
 #define AF_UNIX_MUTEX_NAME "AF_UNIX_CONN"
@@ -2127,3 +2132,20 @@ out:
 
     return ret;
 }
+
+static int add_netdev_lo(void)
+{
+#if defined(RT_USING_DFS_V2) && defined(SAL_USING_AF_UNIX)
+    struct netdev *netdev = RT_NULL;
+    netdev = rt_malloc(sizeof(struct netdev));
+    memset(netdev, '\0', sizeof(struct netdev));
+    netdev_register(netdev, "unix", RT_NULL);
+    netdev->flags |= NETDEV_FLAG_UP;
+    extern int sal_unix_netdev_set_pf_info(struct netdev *netdev);
+    sal_unix_netdev_set_pf_info(netdev);
+    netdev_lo = netdev;
+    return 0;
+#endif
+}
+
+INIT_COMPONENT_EXPORT(add_netdev_lo);

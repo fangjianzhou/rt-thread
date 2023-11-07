@@ -454,6 +454,79 @@ static long _futex_wake(rt_futex_t futex, struct rt_lwp *lwp, int number, int op
     return woken_cnt;
 }
 
+
+/**
+ *  Brief: Wake up to nr_wake futex1 threads.
+ *      If there are more waiters waiting on futex1 than nr_wake,
+ *      insert the remaining at most nr_requeue waiters waiting
+ *      on futex1 into the waiting queue of futex2.
+*/
+static long _futex_requeue(rt_futex_t futex1, rt_futex_t futex2, struct rt_lwp *lwp, 
+                           int nr_wake, int nr_requeue, int opflags)
+{
+    long rtn;
+    long woken_cnt = 0;
+    int is_empty = 0;
+    rt_thread_t thread;
+
+    if (futex1 == futex2)
+    {
+        return -EINVAL;
+    }
+
+    /**
+     * Brief: Wakeup a suspended thread on the futex waiting thread list
+     *
+     * Note: Critical Section
+     * - the futex waiting_thread list (RW)
+     */
+    _futex_lock(lwp, opflags);
+    while (nr_wake && !is_empty)
+    {
+        is_empty = rt_list_isempty(&(futex1->waiting_thread));
+        if (!is_empty)
+        {
+            thread = rt_list_entry(futex1->waiting_thread.next, struct rt_thread, tlist);
+            /* remove from waiting list */
+            rt_list_remove(&(thread->tlist));
+
+            thread->error = RT_EOK;
+            /* resume the suspended thread */
+            rt_thread_resume(thread);
+
+            nr_wake--;
+            woken_cnt++;
+        }
+    }
+    rtn = woken_cnt;
+    is_empty = 0;
+    
+    /**
+     * Brief: Requeue
+     *
+     * Note: Critical Section
+     * - the futex waiting_thread list (RW)
+     */
+    while (!is_empty && nr_requeue)
+    {
+        is_empty = rt_list_isempty(&(futex1->waiting_thread));
+        if (!is_empty)
+        {
+            thread = rt_list_entry(futex1->waiting_thread.next, struct rt_thread, tlist);
+            rt_list_remove(&(thread->tlist));
+            rt_list_insert_before(&(futex2->waiting_thread), &(thread->tlist));
+            nr_requeue--;
+            rtn++;
+        }
+    }
+    _futex_unlock(lwp, opflags);
+
+    /* do schedule */
+    rt_schedule();
+
+    return rtn;
+}
+
 #include <syscall_generic.h>
 
 rt_inline rt_bool_t _timeout_ignored(int op)
@@ -463,7 +536,7 @@ rt_inline rt_bool_t _timeout_ignored(int op)
      * `timeout` should be ignored by implementation, according to POSIX futex(2) manual.
      * since only FUTEX_WAKE is implemented in rt-smart, only FUTEX_WAKE was omitted currently
      */
-    return (op & (FUTEX_WAKE));
+    return ((op & (FUTEX_WAKE)) || (op & (FUTEX_REQUEUE)) || (op & (FUTEX_CMP_REQUEUE)));
 }
 
 sysret_t sys_futex(int *uaddr, int op, int val, const struct timespec *timeout,
@@ -493,7 +566,7 @@ sysret_t sys_futex(int *uaddr, int op, int val, const struct timespec *timeout,
 rt_err_t lwp_futex(struct rt_lwp *lwp, int *uaddr, int op, int val,
                    const struct timespec *timeout, int *uaddr2, int val3)
 {
-    rt_futex_t futex;
+    rt_futex_t futex, futex2;
     rt_err_t rc = 0;
     int op_type = op & ~FUTEX_FLAGS;
     int op_flags = op & FUTEX_FLAGS;
@@ -508,6 +581,33 @@ rt_err_t lwp_futex(struct rt_lwp *lwp, int *uaddr, int op, int val,
                 break;
             case FUTEX_WAKE:
                 rc = _futex_wake(futex, lwp, val, op_flags);
+                break;
+            case FUTEX_REQUEUE:
+                futex2 = _futex_get(uaddr2, lwp, op_flags, &rc);
+                if (!rc)
+                { 
+                    rc = _futex_requeue(futex, futex2, lwp, val, (long)timeout, op_flags);
+                }
+                break;
+            case FUTEX_CMP_REQUEUE:
+                _futex_lock(lwp, op_flags);
+                if (*uaddr == val3)
+                {
+                    rc = 0;
+                }
+                else
+                {
+                    rc = -EAGAIN;
+                }
+                _futex_unlock(lwp, op_flags);
+                if (rc == 0)
+                {
+                    futex2 = _futex_get(uaddr2, lwp, op_flags, &rc);
+                    if (!rc)
+                    { 
+                        rc = _futex_requeue(futex, futex2, lwp, val, (long)timeout, op_flags);
+                    }
+                }
                 break;
             default:
                 LOG_W("User require op=%d which is not implemented", op);

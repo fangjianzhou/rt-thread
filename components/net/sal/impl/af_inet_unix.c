@@ -59,6 +59,7 @@ static const struct sal_socket_ops unix_socket_ops =
     .getpeername = unix_getpeername,
     .getsockname = unix_getsockname,
     .ioctlsocket = inet_ioctlsocket,
+    .socketpair  = unix_socketpair,
 #ifdef SAL_USING_POSIX
     .poll        = inet_poll,
 #endif

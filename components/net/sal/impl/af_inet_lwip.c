@@ -322,6 +322,7 @@ static const struct sal_socket_ops lwip_socket_ops =
     .getpeername = lwip_getpeername,
     .getsockname = inet_getsockname,
     .ioctlsocket = inet_ioctlsocket,
+    .socketpair  = RT_NULL,
 #ifdef SAL_USING_POSIX
     .poll        = inet_poll,
 #endif

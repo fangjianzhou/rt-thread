@@ -24,6 +24,7 @@ struct msg_buf
     rt_size_t data_len;
     int msg_type;
     int data_type;
+    int msg_level;
     int *fd;
     rt_slist_t msg_next;
     rt_slist_t msg_node;
@@ -72,6 +73,7 @@ struct unix_conn
 };
 
 int unix_socket(int domain, int type, int protocol);
+int unix_socketpair(int domain, int type, int protocol, int *fds);
 int unix_bind(int s, const struct sockaddr *name, socklen_t namelen);
 int unix_listen(int s, int backlog);
 int unix_connect(int s, const struct sockaddr *name, socklen_t namelen);

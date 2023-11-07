@@ -6825,6 +6825,26 @@ sysret_t sys_setitimer(int which, const struct itimerspec *restrict new, struct 
     return sys_timer_settime(timerid,0,new,old);
 }
 
+sysret_t sys_socketpair(int domain, int type, int protocol, int fd[2])
+{
+    int ret = 0;
+    int k_fd[2];
+
+    if (!lwp_user_accessable((void *)fd, sizeof(int [2])))
+    {
+        return -EFAULT;
+    }
+
+    ret = socketpair(domain, type, protocol, k_fd);
+
+    if (ret == 0)
+    {
+        lwp_put_to_user(fd, k_fd, sizeof(int [2]));
+    }
+
+    return ret;
+}
+
 const static struct rt_syscall_def func_table[] =
 {
     SYSCALL_SIGN(sys_exit),            /* 01 */
@@ -7069,6 +7089,8 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_ftruncate),
     SYSCALL_SIGN(sys_setitimer),
     SYSCALL_SIGN(sys_utimensat),
+    SYSCALL_SIGN(sys_notimpl),
+    SYSCALL_SIGN(sys_socketpair),                          /* 205 */
 };
 
 const void *lwp_get_sys_api(rt_uint32_t number)

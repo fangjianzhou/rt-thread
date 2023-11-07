@@ -350,6 +350,7 @@ int sal_recvfrom(int socket, void *mem, size_t len, int flags,
 int sal_sendto(int socket, const void *dataptr, size_t size, int flags,
     const struct sockaddr *to, socklen_t tolen);
 int sal_socket(int domain, int type, int protocol);
+int sal_socketpair(int domain, int type, int protocol, int *fds);
 int sal_closesocket(int socket);
 int sal_ioctlsocket(int socket, long cmd, void *arg);
 

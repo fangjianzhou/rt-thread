@@ -308,6 +308,42 @@ int closesocket(int s)
 }
 RTM_EXPORT(closesocket);
 
+int socketpair(int domain, int type, int protocol, int *fds)
+{
+    rt_err_t ret = 0;
+    int sock_fds[2];
+
+    fds[0] = socket(domain, type, protocol);
+    if (fds[0] < 0)
+    {
+        fds[0] = 0;
+        return -1;
+    }
+
+    fds[1] = socket(domain, type, protocol);
+    if (fds[1] < 0)
+    {
+        closesocket(fds[0]);
+        fds[0] = 0;
+        fds[1] = 0;
+        return -1;
+    }
+
+    sock_fds[0] = dfs_net_getsocket(fds[0]);
+    sock_fds[1] = dfs_net_getsocket(fds[1]);
+
+    ret = sal_socketpair(domain, type, protocol, sock_fds);
+
+    if (ret < 0)
+    {
+        closesocket(fds[0]);
+        closesocket(fds[1]);
+    }
+
+    return ret;
+}
+RTM_EXPORT(socketpair);
+
 int ioctlsocket(int s, long cmd, void *arg)
 {
     int socket = dfs_net_getsocket(s);

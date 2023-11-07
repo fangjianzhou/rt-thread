@@ -20,6 +20,8 @@
 #include <rtdef.h>
 #include <netdev.h>
 
+#define UNIXSOCK_BITS (SOCK_STREAM | SOCK_DGRAM)
+
 /* The local virtual network device */
 extern struct netdev *netdev_lo;
 
@@ -59,6 +61,7 @@ static struct msg_buf *create_msgbuf()
     msg->data_type = 0;
     msg->fd = RT_NULL;
     msg->control_data = RT_NULL;
+    msg->msg_level = 0;
     rt_slist_init(&(msg->msg_next));
     rt_slist_init(&(msg->msg_node));
 
@@ -81,6 +84,54 @@ static int conn_callback(struct unix_conn *conn)
     rt_mutex_release(&(correl_conn->conn_lock));
 
     return 0;
+}
+
+int unix_socketpair(int domain, int type, int protocol, int *fds)
+{
+    rt_err_t ret = -ENOMEM;
+    struct dfs_file *dfa = RT_NULL;
+    struct dfs_file *dfb = RT_NULL;
+    struct unix_conn *conna = RT_NULL;
+    struct unix_conn *connb = RT_NULL;
+    struct unix_sock *socka = RT_NULL;
+    struct unix_sock *sockb = RT_NULL;
+
+    dfa = fd_get(fds[0]);
+    if (!dfa)
+        goto out;
+
+    dfb = fd_get(fds[1]);
+    if (!dfb)
+        goto out;
+
+    socka = dfa->vnode->data;
+    RT_ASSERT(socka != RT_NULL)
+
+    sockb = dfb->vnode->data;
+    RT_ASSERT(sockb != RT_NULL)
+
+    conna = socka->conn;
+    RT_ASSERT(conna != RT_NULL)
+
+    connb = sockb->conn;
+    RT_ASSERT(connb != RT_NULL)
+
+    conna->correl_conn = connb;
+    connb->correl_conn = conna;
+
+    conna->state |= CONN_CONNECT;
+    connb->state |= CONN_CONNECT;
+
+    ret = 0;
+
+out:
+    if (ret < 0)
+    {
+        rt_set_errno(-ret);
+        ret = -1;
+    }
+
+    return ret;
 }
 
 static struct unix_conn *create_conn(int domain, int type, int protocol)
@@ -280,7 +331,7 @@ int unix_socket(int domain, int type, int protocol)
     struct unix_conn *conn = RT_NULL;
     struct unix_sock *sock = RT_NULL;
 
-    switch(type)
+    switch((type & UNIXSOCK_BITS))
     {
         case SOCK_STREAM :
         case SOCK_DGRAM :
@@ -315,6 +366,8 @@ int unix_socket(int domain, int type, int protocol)
     sock = conn->sock;
     df->vnode->data = sock;
     unix_sock_init(sock, domain);
+
+    sock->flags |= (type & O_NONBLOCK);
 
     return fd;
 
@@ -1225,6 +1278,7 @@ static int sendmsg_do(const struct msghdr *message, struct unix_conn *conn)
             }
 
             msg->data_type = cmsg->cmsg_type;
+            msg->msg_level = cmsg->cmsg_level;
             msg->data_len = cmsg->cmsg_len;
         }
     }
@@ -1548,35 +1602,42 @@ static int unix_stream_recvmsg(struct unix_sock *sock, const struct msghdr *mess
     msg = rt_slist_entry(node, struct msg_buf, msg_node);
     rt_mutex_release(&(conn->conn_lock));
 
-    if (controllen != 0)
+    if ((controllen != 0))
     {
-        if (msg->data_type == SCM_RIGHTS)
+        if (cmsg)
         {
-            if (msg->data_len > 0)
+            if (msg->data_type == SCM_RIGHTS)
             {
-                fd_array = _fd_news(msg->data_len, msg->fd);
-                if (fd_array)
+                if (msg->data_len > 0)
                 {
-                    memcpy(CMSG_DATA(cmsg), (void *)fd_array, msg->data_len - CMSG_LEN(0));
-                }
-                else
-                {
-                    _close_fd_news(msg->fd, ((msg->data_len - CMSG_LEN(0))/sizeof(int)));
-                }
+                    fd_array = _fd_news(msg->data_len, msg->fd);
+                    if (fd_array)
+                    {
+                        memcpy(CMSG_DATA(cmsg), (void *)fd_array, msg->data_len - CMSG_LEN(0));
+                    }
+                    else
+                    {
+                        _close_fd_news(msg->fd, ((msg->data_len - CMSG_LEN(0))/sizeof(int)));
+                    }
 
-                if (msg->fd)
-                {
-                    rt_free(msg->fd);
-                    msg->fd = RT_NULL;
+                    if (msg->fd)
+                    {
+                        rt_free(msg->fd);
+                        msg->fd = RT_NULL;
+                    }
                 }
             }
-        }
-        else
-        {
-            if (msg->control_data)
+            else
             {
-                memcpy(CMSG_DATA(cmsg), msg->control_data, msg->data_len);
+                if (msg->control_data)
+                {
+                    memcpy(CMSG_DATA(cmsg), msg->control_data, msg->data_len);
+                }
             }
+
+            cmsg->cmsg_len = msg->data_len;
+            cmsg->cmsg_level = msg->msg_level;
+            cmsg->cmsg_type = msg->data_type;
         }
     }
     else

@@ -974,6 +974,7 @@ struct rt_thread
     int                         tid;                    /**< thread ID used by process */
     int                         tid_ref_count;          /**< reference of tid */
     void                        *susp_recycler;         /**< suspended recycler on this thread */
+    void                        *robust_list;           /**< pi lock, very carefully, it's a userspace list!*/
 
     rt_uint64_t                 user_time;
     rt_uint64_t                 system_time;

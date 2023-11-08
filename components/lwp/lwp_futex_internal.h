@@ -43,6 +43,7 @@ struct rt_futex
 
     rt_list_t waiting_thread;
     struct rt_object *custom_obj;
+    rt_mutex_t mutex;
 };
 typedef struct rt_futex *rt_futex_t;
 

@@ -6769,6 +6769,59 @@ sysret_t sys_socketpair(int domain, int type, int protocol, int fd[2])
 #endif
 }
 
+sysret_t sys_set_robust_list(struct robust_list_head *head, size_t len)
+{
+    if (len != sizeof(*head))
+		return -EINVAL;
+
+	rt_thread_self()->robust_list = head;
+    return 0;
+}
+
+sysret_t sys_get_robust_list(int tid, struct robust_list_head **head_ptr, size_t *len_ptr)
+{
+    rt_thread_t thread;
+    size_t len;
+    struct robust_list_head *head;
+
+    if (!lwp_user_accessable((void *)head_ptr, sizeof(struct robust_list_head *)))
+    {
+        return -EFAULT;
+    }
+    if (!lwp_user_accessable((void *)len_ptr, sizeof(size_t)))
+    {
+        return -EFAULT;
+    }
+
+    if (tid == 0)
+    {
+        thread = rt_thread_self();
+        head = thread->robust_list;
+    }
+    else
+    {
+        thread = lwp_tid_get_thread_and_inc_ref(tid);
+        if (thread)
+        {
+            head = thread->robust_list;
+            lwp_tid_dec_ref(thread);
+        }
+        else
+        {
+            return -ESRCH;
+        }
+    }
+
+    len = sizeof(*(head));
+
+    if (!lwp_put_to_user(len_ptr, &len, sizeof(size_t)))
+        return -EFAULT;
+    if (!lwp_put_to_user(head_ptr, &head, sizeof(struct robust_list_head *)))
+        return -EFAULT;
+
+    return 0;
+}
+
 const static struct rt_syscall_def func_table[] =
 {
     SYSCALL_SIGN(sys_exit),            /* 01 */
@@ -7016,6 +7069,8 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_syslog),
     SYSCALL_SIGN(sys_socketpair),                       /* 205 */
     SYSCALL_SIGN(sys_wait4),
+    SYSCALL_SIGN(sys_set_robust_list),
+    SYSCALL_SIGN(sys_get_robust_list),
 };
 
 const void *lwp_get_sys_api(rt_uint32_t number)

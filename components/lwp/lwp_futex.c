@@ -11,6 +11,7 @@
  * 2023-08-08     Shell        Fix return value of futex(wait); Fix ops that only
  *                             FUTEX_PRIVATE is supported currently
  * 2023-11-03     Shell        Add Support for ~FUTEX_PRIVATE
+ * 2023-11-16     xqyjlj       Add Support for futex requeue and futex pi
  */
 
 #include "lwp_futex_internal.h"
@@ -82,6 +83,11 @@ static rt_err_t _pftx_destroy_locked(void *data)
         lwp_avl_remove(&futex->node, (struct lwp_avl_struct **)futex->node.data);
 
         /* release object */
+        if (futex->mutex)
+        {
+            rt_mutex_delete(futex->mutex);
+            futex->mutex = RT_NULL;
+        }
         rt_free(futex);
         ret = 0;
     }
@@ -139,6 +145,7 @@ static rt_futex_t _pftx_create_locked(int *uaddr, struct rt_lwp *lwp)
                     futex->node.avl_key = (avl_key_t)uaddr;
                     futex->node.data = &lwp->address_search_head;
                     futex->custom_obj = obj;
+                    futex->mutex = RT_NULL;
                     rt_list_init(&(futex->waiting_thread));
 
                     /**
@@ -205,6 +212,11 @@ static rt_err_t _sftx_destroy(void *data)
     {
         /* delete it even it's not in the table */
         futex_global_table_delete(&futex->entry.key);
+        if (futex->mutex)
+        {
+            rt_mutex_delete(futex->mutex);
+            futex->mutex = RT_NULL;
+        }
         rt_free(futex);
         ret = 0;
     }
@@ -241,6 +253,7 @@ static rt_futex_t _sftx_create(struct shared_futex_key *key, struct rt_lwp *lwp)
                 }
                 else
                 {
+                    futex->mutex = RT_NULL;
                     rt_list_init(&(futex->waiting_thread));
                     futex->custom_obj = obj;
                 }
@@ -265,10 +278,12 @@ static rt_futex_t _sftx_get(void *uaddr, struct rt_lwp *lwp, int op, rt_err_t *r
     if (varea)
     {
         key.mobj = varea->mem_obj;
-        key.offset = varea->offset;
+        key.offset = ((varea->offset) << MM_PAGE_SHIFT)
+                     | ((long)uaddr & ((1 << MM_PAGE_SHIFT) - 1));
         RD_UNLOCK(lwp->aspace);
 
         /* query for the key */
+        _futex_lock(lwp, op & ~FUTEX_PRIVATE);
         error = futex_global_table_find(&key, &futex);
         if (error != RT_EOK)
         {
@@ -279,6 +294,7 @@ static rt_futex_t _sftx_get(void *uaddr, struct rt_lwp *lwp, int op, rt_err_t *r
             else
                 error = 0;
         }
+        _futex_unlock(lwp, op & ~FUTEX_PRIVATE);
     }
     else
     {
@@ -349,6 +365,27 @@ static rt_err_t _suspend_thread_locked(rt_thread_t thread, rt_futex_t futex)
     }
 
     return rc;
+}
+
+rt_inline int _futex_cmpxchg_value(int *curval, int *uaddr, int uval, int newval)
+{
+    int err = 0;
+
+    if (!lwp_user_accessable((void *)uaddr, sizeof(*uaddr)))
+    {
+        err = -EFAULT;
+        goto exit;
+    }
+
+    //TODO: maybe need uaccess_enable/disable api
+    if (!atomic_compare_exchange_strong(uaddr, &uval, newval))
+    {
+        *curval = uval;
+        err = -EAGAIN;
+    }
+
+exit:
+    return err;
 }
 
 static int _futex_wait(rt_futex_t futex, struct rt_lwp *lwp, int *uaddr,
@@ -461,7 +498,7 @@ static long _futex_wake(rt_futex_t futex, struct rt_lwp *lwp, int number, int op
  *      insert the remaining at most nr_requeue waiters waiting
  *      on futex1 into the waiting queue of futex2.
 */
-static long _futex_requeue(rt_futex_t futex1, rt_futex_t futex2, struct rt_lwp *lwp, 
+static long _futex_requeue(rt_futex_t futex1, rt_futex_t futex2, struct rt_lwp *lwp,
                            int nr_wake, int nr_requeue, int opflags)
 {
     long rtn;
@@ -480,7 +517,6 @@ static long _futex_requeue(rt_futex_t futex1, rt_futex_t futex2, struct rt_lwp *
      * Note: Critical Section
      * - the futex waiting_thread list (RW)
      */
-    _futex_lock(lwp, opflags);
     while (nr_wake && !is_empty)
     {
         is_empty = rt_list_isempty(&(futex1->waiting_thread));
@@ -499,8 +535,7 @@ static long _futex_requeue(rt_futex_t futex1, rt_futex_t futex2, struct rt_lwp *
         }
     }
     rtn = woken_cnt;
-    is_empty = 0;
-    
+
     /**
      * Brief: Requeue
      *
@@ -519,12 +554,122 @@ static long _futex_requeue(rt_futex_t futex1, rt_futex_t futex2, struct rt_lwp *
             rtn++;
         }
     }
-    _futex_unlock(lwp, opflags);
 
     /* do schedule */
     rt_schedule();
 
     return rtn;
+}
+
+/* timeout argument measured against the CLOCK_REALTIME clock. */
+static long _futex_lock_pi(rt_futex_t futex, struct rt_lwp *lwp, int *uaddr, const struct timespec *timeout,
+                           int op_flags, rt_bool_t trylock)
+{
+    int word = 0, nword, cword;
+    int tid = 0;
+    rt_err_t err = 0;
+    rt_thread_t thread = RT_NULL, current_thread = RT_NULL;
+    rt_tick_t to = RT_WAITING_FOREVER;
+
+    if (!lwp_user_accessable((void *)uaddr, sizeof(*uaddr)))
+    {
+        return -EFAULT;
+    }
+
+    current_thread = rt_thread_self();
+
+    _futex_lock(lwp, op_flags);
+
+    lwp_get_from_user(&word, (void*)uaddr, sizeof(int));
+    tid = word & FUTEX_TID_MASK;
+    if (word == 0)
+    {
+        /* If the value is 0, then the kernel tries
+             to atomically set the futex value to the caller's TID.  */
+        nword = current_thread->tid;
+        if (_futex_cmpxchg_value(&cword, uaddr, word, nword))
+        {
+            _futex_unlock(lwp, op_flags);
+            return -EAGAIN;
+        }
+        _futex_unlock(lwp, op_flags);
+        return 0;
+    }
+    else
+    {
+        thread = lwp_tid_get_thread_and_inc_ref(tid);
+        if (thread == RT_NULL)
+        {
+            _futex_unlock(lwp, op_flags);
+            return -ESRCH;
+        }
+        lwp_tid_dec_ref(thread);
+
+        nword = word | FUTEX_WAITERS; //TODO: maybe need uaccess_enable/disable api
+        if (_futex_cmpxchg_value(&cword, uaddr, word, nword))
+        {
+            _futex_unlock(lwp, op_flags);
+            return -EAGAIN;
+        }
+        word = nword;
+    }
+
+    if (futex->mutex == RT_NULL)
+    {
+        futex->mutex = rt_mutex_create("futexpi", RT_IPC_FLAG_PRIO);
+        if (futex->mutex == RT_NULL)
+        {
+            _futex_unlock(lwp, op_flags);
+            return -ENOMEM;
+        }
+
+        /* set mutex->owner */
+        rt_spin_lock(&(futex->mutex->spinlock));
+        futex->mutex->owner = thread;
+        futex->mutex->hold = 1;
+        rt_spin_unlock(&(futex->mutex->spinlock));
+    }
+    if (timeout)
+    {
+        to = rt_timespec_to_tick(timeout);
+    }
+
+    if (trylock)
+    {
+        to = RT_WAITING_NO;
+    }
+    _futex_unlock(lwp, op_flags);
+
+    err = rt_mutex_take_interruptible(futex->mutex, to);
+    if (err == -RT_ETIMEOUT)
+    {
+        err = -EDEADLK;
+    }
+
+    _futex_lock(lwp, op_flags);
+    nword = current_thread->tid | FUTEX_WAITERS;
+    if (_futex_cmpxchg_value(&cword, uaddr, word, nword))
+    {
+        err = -EAGAIN;
+    }
+    _futex_unlock(lwp, op_flags);
+
+    return err;
+}
+
+static long _futex_unlock_pi(rt_futex_t futex, struct rt_lwp *lwp, int op_flags)
+{
+    rt_err_t err = 0;
+    _futex_lock(lwp, op_flags);
+    if (!futex->mutex)
+    {
+        _futex_unlock(lwp, op_flags);
+        return -EPERM;
+    }
+    _futex_unlock(lwp, op_flags);
+
+    err = rt_mutex_release(futex->mutex);
+    return err;
 }
 
 #include <syscall_generic.h>
@@ -536,7 +681,8 @@ rt_inline rt_bool_t _timeout_ignored(int op)
      * `timeout` should be ignored by implementation, according to POSIX futex(2) manual.
      * since only FUTEX_WAKE is implemented in rt-smart, only FUTEX_WAKE was omitted currently
      */
-    return ((op & (FUTEX_WAKE)) || (op & (FUTEX_REQUEUE)) || (op & (FUTEX_CMP_REQUEUE)));
+    return ((op & (FUTEX_WAKE)) || (op & (FUTEX_REQUEUE)) || (op & (FUTEX_CMP_REQUEUE))
+            || (op & (FUTEX_UNLOCK_PI)) || (op & (FUTEX_TRYLOCK_PI)));
 }
 
 sysret_t sys_futex(int *uaddr, int op, int val, const struct timespec *timeout,
@@ -585,11 +731,14 @@ rt_err_t lwp_futex(struct rt_lwp *lwp, int *uaddr, int op, int val,
             case FUTEX_REQUEUE:
                 futex2 = _futex_get(uaddr2, lwp, op_flags, &rc);
                 if (!rc)
-                { 
+                {
+                    _futex_lock(lwp, op_flags);
                     rc = _futex_requeue(futex, futex2, lwp, val, (long)timeout, op_flags);
+                    _futex_unlock(lwp, op_flags);
                 }
                 break;
             case FUTEX_CMP_REQUEUE:
+                futex2 = _futex_get(uaddr2, lwp, op_flags, &rc);
                 _futex_lock(lwp, op_flags);
                 if (*uaddr == val3)
                 {
@@ -599,15 +748,23 @@ rt_err_t lwp_futex(struct rt_lwp *lwp, int *uaddr, int op, int val,
                 {
                     rc = -EAGAIN;
                 }
-                _futex_unlock(lwp, op_flags);
                 if (rc == 0)
                 {
-                    futex2 = _futex_get(uaddr2, lwp, op_flags, &rc);
                     if (!rc)
-                    { 
+                    {
                         rc = _futex_requeue(futex, futex2, lwp, val, (long)timeout, op_flags);
                     }
                 }
+                _futex_unlock(lwp, op_flags);
+                break;
+            case FUTEX_LOCK_PI:
+                rc = _futex_lock_pi(futex, lwp, uaddr, timeout, op_flags, RT_FALSE);
+                break;
+            case FUTEX_UNLOCK_PI:
+                rc = _futex_unlock_pi(futex, lwp, op_flags);
+                break;
+            case FUTEX_TRYLOCK_PI:
+                rc = _futex_lock_pi(futex, lwp, uaddr, 0, op_flags, RT_TRUE);
                 break;
             default:
                 LOG_W("User require op=%d which is not implemented", op);
@@ -617,4 +774,142 @@ rt_err_t lwp_futex(struct rt_lwp *lwp, int *uaddr, int op, int val,
     }
 
     return rc;
+}
+
+rt_inline int _fetch_robust_entry(struct robust_list **entry, struct robust_list **head, rt_bool_t *is_pi)
+{
+    unsigned long uentry;
+
+    if (!lwp_user_accessable((void *)head, sizeof(*head)))
+    {
+        return -EFAULT;
+    }
+
+    if (lwp_get_from_user(&uentry, (void *)head, sizeof(*head)) != sizeof(*head))
+    {
+        return -EFAULT;
+    }
+
+    *entry = (void *)(uentry & ~1UL);
+    *is_pi = uentry & 1;
+
+    return 0;
+}
+
+static int _handle_futex_death(int *uaddr, rt_thread_t thread, rt_bool_t is_pi, rt_bool_t is_pending_op)
+{
+	int word, cword, nword;
+	rt_err_t rc;
+    struct rt_lwp *lwp;
+    rt_futex_t futex;
+
+	/* Futex address must be 32bit aligned */
+	if ((((unsigned long)uaddr) % sizeof(*uaddr)) != 0)
+		return -1;
+
+    lwp = thread->lwp;
+retry:
+
+    if (!lwp_user_accessable((void *)uaddr, sizeof(*uaddr)))
+    {
+        return -1;
+    }
+
+    if (lwp_get_from_user(&word, (void *)uaddr, sizeof(*uaddr)) != sizeof(*uaddr))
+    {
+        return -1;
+    }
+
+    futex = _futex_get(uaddr, lwp, FUTEX_PRIVATE, &rc);
+	if (is_pending_op && !is_pi && !word) {
+        _futex_wake(futex, lwp, 1, FUTEX_PRIVATE);
+		return 0;
+	}
+
+	if ((word & FUTEX_TID_MASK) != thread->tid)
+		return 0;
+
+	nword = (word & FUTEX_WAITERS) | FUTEX_OWNER_DIED;
+
+	if ((rc = _futex_cmpxchg_value(&cword, uaddr, word, nword))) {
+		switch (rc) {
+		case -EFAULT:
+			return -1;
+		case -EAGAIN:
+			rt_schedule();
+			goto retry;
+		default:
+			LOG_W("unknown errno: %d in '%s'", rc, __FUNCTION__);
+			return rc;
+		}
+	}
+
+	if (cword != word)
+		goto retry;
+
+	if (!is_pi && (word & FUTEX_WAITERS))
+		_futex_wake(futex, lwp, 1, FUTEX_PRIVATE);
+
+	return 0;
+}
+
+/**
+ *  Brief: Walk thread->robust_list mark
+ *      any locks found there dead, and notify any waiters.
+ *
+ *  note: very carefully, it's a userspace list!
+ */
+void lwp_futex_exit_robust_list(rt_thread_t thread)
+{
+    struct robust_list *entry = RT_NULL;
+    struct robust_list *next_entry = RT_NULL;
+    struct robust_list *pending= RT_NULL;
+    struct robust_list_head *head;
+    unsigned int limit = 2048;
+    rt_bool_t pi, pip, next_pi;
+    unsigned long futex_offset;
+    int rc;
+
+    head = thread->robust_list;
+
+    if (head == RT_NULL)
+        return;
+
+    if (_fetch_robust_entry(&entry, &head->list.next, &pi))
+		return;
+
+    if (!lwp_user_accessable((void *)&head->futex_offset, sizeof(head->futex_offset)))
+    {
+        return;
+    }
+
+    if (lwp_get_from_user(&futex_offset, (void *)&head->futex_offset, sizeof(head->futex_offset))
+        != sizeof(head->futex_offset))
+    {
+        return;
+    }
+
+    if (_fetch_robust_entry(&pending, &head->list_op_pending, &pip))
+    {
+        return;
+    }
+
+    while (entry != &head->list) {
+        rc = _fetch_robust_entry(&next_entry, &entry->next, &next_pi);
+		if (entry != pending) {
+            if (_handle_futex_death((void *)entry + futex_offset, thread, pi, RT_FALSE))
+                return;
+        }
+        if (rc)
+            return;
+        entry = next_entry;
+        pi = next_pi;
+
+        if (!--limit)
+            break;
+    }
+
+    if (pending) {
+        _handle_futex_death((void *)pending + futex_offset, thread, pip, RT_TRUE);
+    }
 }

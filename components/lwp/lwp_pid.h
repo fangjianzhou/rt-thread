@@ -54,7 +54,28 @@ char* lwp_pid2name(int32_t pid);
 
 int lwp_getpid(void);
 
-pid_t lwp_waitpid(const pid_t pid, int *status, int options);
+struct rusage
+{
+    struct timeval ru_utime;
+    struct timeval ru_stime;
+
+    long ru_maxrss;
+    long ru_ixrss;
+    long ru_idrss;
+    long ru_isrss;
+    long ru_minflt;
+    long ru_majflt;
+    long ru_nswap;
+    long ru_inblock;
+    long ru_oublock;
+    long ru_msgsnd;
+    long ru_msgrcv;
+    long ru_nsignals;
+    long ru_nvcsw;
+    long ru_nivcsw;
+    long reserved[16];
+};
+pid_t lwp_waitpid(const pid_t pid, int *status, int options, struct rusage *ru);
 pid_t waitpid(pid_t pid, int *status, int options);
 long list_process(void);
 

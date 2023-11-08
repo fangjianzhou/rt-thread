@@ -4424,7 +4424,7 @@ sysret_t sys_waitpid(int32_t pid, int *status, int options)
     }
     else
     {
-        ret = lwp_waitpid(pid, status, options);
+        ret = waitpid(pid, status, options);
     }
 #else
     if (!lwp_user_accessable((void *)status, sizeof(int)))
@@ -5069,6 +5069,11 @@ sysret_t sys_pipe(int fd[2])
     lwp_put_to_user((void *)fd, kfd, sizeof(int[2]));
 
     return (ret < 0 ? GET_ERRNO() : ret);
+}
+
+pid_t sys_wait4(pid_t pid, int *status, int options, struct rusage *ru)
+{
+    return lwp_waitpid(pid, status, options, ru);
 }
 
 sysret_t sys_clock_settime(clockid_t clk, const struct timespec *ts)
@@ -7114,7 +7119,8 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_setitimer),
     SYSCALL_SIGN(sys_utimensat),
     SYSCALL_SIGN(sys_syslog),
-    SYSCALL_SIGN(sys_socketpair),                          /* 205 */
+    SYSCALL_SIGN(sys_socketpair),                       /* 205 */
+    SYSCALL_SIGN(sys_wait4),
 };
 
 const void *lwp_get_sys_api(rt_uint32_t number)

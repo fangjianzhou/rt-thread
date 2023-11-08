@@ -152,6 +152,7 @@ struct rt_lwp
     uint64_t generation;
     unsigned int asid;
 #endif
+    struct rusage rt_rusage;
 };
 typedef struct rt_lwp *rt_lwp_t;
 

@@ -407,6 +407,7 @@ rt_lwp_t lwp_create(rt_base_t flags)
             }
             lwp_pid_lock_release();
         }
+        rt_memset(&new_lwp->rt_rusage,0,sizeof(new_lwp->rt_rusage));
     }
 
     LOG_D("%s(pid=%d) => %p", __func__, new_lwp->pid, new_lwp);
@@ -503,6 +504,10 @@ void _thread_exit(rt_lwp_t lwp, rt_thread_t thread)
     thread->tid = 0;
 
     LWP_LOCK(lwp);
+    lwp->rt_rusage.ru_stime.tv_sec += thread->system_time / RT_TICK_PER_SECOND;
+    lwp->rt_rusage.ru_stime.tv_usec += thread->system_time % RT_TICK_PER_SECOND * RT_TICK_PER_SECOND;
+    lwp->rt_rusage.ru_utime.tv_sec += thread->user_time / RT_TICK_PER_SECOND;
+    lwp->rt_rusage.ru_utime.tv_usec += thread->user_time % RT_TICK_PER_SECOND * RT_TICK_PER_SECOND;
     rt_list_remove(&thread->sibling);
     LWP_UNLOCK(lwp);
 
@@ -762,11 +767,12 @@ int lwp_getpid(void)
  */
 static sysret_t _lwp_wait_and_recycle(struct rt_lwp *child, rt_thread_t cur_thr,
                                       struct rt_lwp *self_lwp, int *status,
-                                      int options)
+                                      int options, struct rusage *ru)
 {
     sysret_t error;
     int lwp_stat;
     int terminated;
+    struct rusage rt_rusage;
 
     if (!child)
     {
@@ -831,6 +837,14 @@ static sysret_t _lwp_wait_and_recycle(struct rt_lwp *child, rt_thread_t cur_thr,
         terminated = child->terminated;
         LWP_UNLOCK(child);
 
+        if (ru != RT_NULL)
+        {
+            rt_rusage.ru_stime.tv_sec = child->rt_rusage.ru_stime.tv_sec;
+            rt_rusage.ru_stime.tv_usec = child->rt_rusage.ru_stime.tv_usec;
+            rt_rusage.ru_utime.tv_sec = child->rt_rusage.ru_utime.tv_sec;
+            rt_rusage.ru_utime.tv_usec = child->rt_rusage.ru_utime.tv_usec;
+            lwp_data_put(self_lwp, ru, &rt_rusage, sizeof(*ru));
+        }
         if (error > 0)
         {
             if (terminated)
@@ -849,9 +863,7 @@ static sysret_t _lwp_wait_and_recycle(struct rt_lwp *child, rt_thread_t cur_thr,
     return error;
 }
 
-pid_t waitpid(pid_t pid, int *status, int options) __attribute__((alias("lwp_waitpid")));
-
-pid_t lwp_waitpid(const pid_t pid, int *status, int options)
+pid_t lwp_waitpid(const pid_t pid, int *status, int options, struct rusage *ru)
 {
     pid_t rc = -1;
     struct rt_thread *thread;
@@ -878,7 +890,7 @@ pid_t lwp_waitpid(const pid_t pid, int *status, int options)
             lwp_pid_lock_release();
 
             if (rc == RT_EOK)
-                rc = _lwp_wait_and_recycle(child, thread, self_lwp, status, options);
+                rc = _lwp_wait_and_recycle(child, thread, self_lwp, status, options, ru);
         }
         else if (pid == -1)
         {
@@ -887,7 +899,7 @@ pid_t lwp_waitpid(const pid_t pid, int *status, int options)
             LWP_UNLOCK(self_lwp);
             RT_ASSERT(!child || child->parent == self_lwp);
 
-            rc = _lwp_wait_and_recycle(child, thread, self_lwp, status, options);
+            rc = _lwp_wait_and_recycle(child, thread, self_lwp, status, options, ru);
         }
         else
         {
@@ -907,6 +919,11 @@ pid_t lwp_waitpid(const pid_t pid, int *status, int options)
     }
 
     return rc;
+}
+
+pid_t waitpid(pid_t pid, int *status, int options)
+{
+    return lwp_waitpid(pid, status, options, RT_NULL);
 }
 
 #ifdef RT_USING_FINSH

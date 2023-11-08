@@ -1488,6 +1488,30 @@ sysret_t sys_mb_recv(rt_mailbox_t mb, rt_ubase_t *value, rt_int32_t timeout)
     return ret;
 }
 
+int syslog_ctrl(int type, char *buf, int len);
+sysret_t sys_syslog(int type, char *buf, int len)
+{
+    char *tmp;
+    int ret = -1;
+
+    if (!lwp_user_accessable((void *)buf, len))
+    {
+        return -EFAULT;
+    }
+
+    tmp = (char *)rt_malloc(len);
+    if (!tmp)
+    {
+        return -ENOMEM;
+    }
+
+    ret = syslog_ctrl(type, tmp, len);
+    lwp_put_to_user(buf, tmp, len);
+    rt_free(tmp);
+
+    return ret;
+}
+
 rt_mq_t sys_mq_create(const char *name,
                      rt_size_t   msg_size,
                      rt_size_t   max_msgs,
@@ -7089,7 +7113,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_ftruncate),
     SYSCALL_SIGN(sys_setitimer),
     SYSCALL_SIGN(sys_utimensat),
-    SYSCALL_SIGN(sys_notimpl),
+    SYSCALL_SIGN(sys_syslog),
     SYSCALL_SIGN(sys_socketpair),                          /* 205 */
 };
 

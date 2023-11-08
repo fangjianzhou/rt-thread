@@ -59,6 +59,11 @@
 /* global errno in RT-Thread */
 static volatile int __rt_errno;
 
+rt_weak int syslog_ctrl(int type, char *buf, int len)
+{
+    return 0;
+}
+
 #if defined(RT_USING_DEVICE) && defined(RT_USING_CONSOLE)
 static rt_device_t _console_device = RT_NULL;
 #endif

@@ -710,7 +710,7 @@ static int epoll_do(struct rt_eventpoll *ep, struct epoll_event *events, int max
             level = rt_spin_lock_irqsave(&ep->spinlock);
             ep->tirggered = 0;
             rt_spin_unlock_irqrestore(&ep->spinlock, level);
-            if ((timeout >= 0) || (event_num > 0))
+            if ((timeout > 0) || (event_num > 0))
                 break;
         }
 

@@ -6443,24 +6443,31 @@ sysret_t sys_epoll_ctl(int fd, int op, int fd2, struct epoll_event *ev)
     int ret = 0;
     struct epoll_event *kev = RT_NULL;
 
-    if (!lwp_user_accessable((void *)ev, sizeof(struct epoll_event)))
+    if (ev)
+    {
+        if (!lwp_user_accessable((void *)ev, sizeof(struct epoll_event)))
         return -EFAULT;
 
-    kev = kmem_get(sizeof(struct epoll_event));
-    if (kev == RT_NULL)
-    {
-        return -ENOMEM;
-    }
+        kev = kmem_get(sizeof(struct epoll_event));
+        if (kev == RT_NULL)
+        {
+            return -ENOMEM;
+        }
 
-    if (lwp_get_from_user(kev, ev, sizeof(struct epoll_event)) != sizeof(struct epoll_event))
-    {
+        if (lwp_get_from_user(kev, ev, sizeof(struct epoll_event)) != sizeof(struct epoll_event))
+        {
+            kmem_put(kev);
+            return -EINVAL;
+        }
+
+        ret = epoll_ctl(fd, op, fd2, kev);
+
         kmem_put(kev);
-        return -EINVAL;
     }
-
-    ret = epoll_ctl(fd, op, fd2, kev);
-
-    kmem_put(kev);
+    else
+    {
+         ret = epoll_ctl(fd, op, fd2, RT_NULL);
+    }
 
     return (ret < 0 ? GET_ERRNO() : ret);
 }

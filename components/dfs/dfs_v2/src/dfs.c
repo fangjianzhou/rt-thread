@@ -643,7 +643,7 @@ int dfs_dup_from(int oldfd, struct dfs_fdtable *fdtab)
         file->fops = fdtab->fds[oldfd]->fops;
         file->dentry = dfs_dentry_ref(fdtab->fds[oldfd]->dentry);
         file->vnode = fdtab->fds[oldfd]->vnode;
-        file->mmap_context = fdtab->fds[oldfd]->mmap_context;
+        file->mmap_context = RT_NULL;
         file->data = fdtab->fds[oldfd]->data;
     }
 

@@ -6863,6 +6863,7 @@ sysret_t sys_setitimer(int which, const struct itimerspec *restrict new, struct 
 
 sysret_t sys_socketpair(int domain, int type, int protocol, int fd[2])
 {
+#ifdef RT_USING_SAL
     int ret = 0;
     int k_fd[2];
 
@@ -6879,6 +6880,9 @@ sysret_t sys_socketpair(int domain, int type, int protocol, int fd[2])
     }
 
     return ret;
+#else
+    return -ELIBACC;
+#endif
 }
 
 const static struct rt_syscall_def func_table[] =

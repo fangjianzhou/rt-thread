@@ -113,6 +113,11 @@ rt_weak const char *rt_hw_cpu_arch(void)
     return "unknown";
 }
 
+rt_weak void rt_show_firmware_version(void)
+{
+    return;
+}
+
 struct _errno_str_t
 {
     rt_err_t error;
@@ -741,6 +746,7 @@ void rt_show_version(void)
     rt_kprintf(" / | \\     %d.%d.%d build %s %s\n",
                (rt_int32_t)RT_VERSION_MAJOR, (rt_int32_t)RT_VERSION_MINOR, (rt_int32_t)RT_VERSION_PATCH, __DATE__, __TIME__);
     rt_kprintf(" 2006 - 2022 Copyright by RT-Thread team\n");
+    rt_show_firmware_version();
 }
 RTM_EXPORT(rt_show_version);
 

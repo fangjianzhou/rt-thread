@@ -709,10 +709,10 @@ int unix_connect(int s, const struct sockaddr *name, socklen_t namelen)
     if (!new_conn)
         goto out;
 
-    ret = -ECONNREFUSED;
+    ret = -EPROTOTYPE;
     if (ser_sock->conn)
     {
-        if (!(ser_sock->conn->state & CONN_LISTEN))
+        if (!(ser_sock->conn->state & CONN_LISTEN) && !((ser_sock->conn->type & SOCK_DGRAM) && (conn->type & SOCK_DGRAM)))
         {
             goto fail_out;
         }
@@ -722,23 +722,32 @@ int unix_connect(int s, const struct sockaddr *name, socklen_t namelen)
         goto fail_out;
     }
 
-    if ((rt_atomic_load(&(ser_sock->conn_counter)) + 1) > rt_atomic_load(&(ser_sock->listen_num)))
+    ret = -ECONNREFUSED;
+    if ((rt_atomic_load(&(ser_sock->conn_counter)) + 1) > rt_atomic_load(&(ser_sock->listen_num)) && !((ser_sock->conn->type & SOCK_DGRAM) && (conn->type & SOCK_DGRAM)))
     {
         goto fail_out;
     }
     else
     {
-        rt_mutex_take(&(conn->conn_lock), RT_WAITING_FOREVER);
-        conn->correl_conn = new_conn;
-        new_conn->correl_conn = conn;
-        rt_mutex_release(&(conn->conn_lock));
+        if ((ser_sock->conn->state & CONN_LISTEN))
+        {
+            rt_mutex_take(&(conn->conn_lock), RT_WAITING_FOREVER);
+            conn->correl_conn = new_conn;
+            new_conn->correl_conn = conn;
+            rt_mutex_release(&(conn->conn_lock));
 
-        rt_mutex_take(&(ser_sock->sock_lock), RT_WAITING_FOREVER);
+            rt_mutex_take(&(ser_sock->sock_lock), RT_WAITING_FOREVER);
 
-        rt_slist_append(&(ser_sock->wait_conn_head), &(conn->conn_node));
-        rt_wqueue_wakeup(&(ser_sock->wq_head), (void*)POLLIN);
+            rt_slist_append(&(ser_sock->wait_conn_head), &(conn->conn_node));
+            rt_wqueue_wakeup(&(ser_sock->wq_head), (void*)POLLIN);
 
-        rt_mutex_release(&(ser_sock->sock_lock));
+            rt_mutex_release(&(ser_sock->sock_lock));
+        }
+        else
+        {
+            conn->correl_conn = ser_sock->conn;
+            conn->state |= CONN_CONNECT;
+        }
 
         ret = 0;
         if (sock->flags & O_NONBLOCK)
@@ -2160,8 +2169,12 @@ int unix_close(int s)
 
     rt_mutex_take(&(conn->conn_lock), RT_WAITING_FOREVER);
 
-    correl_conn = conn->correl_conn;
-    conn->correl_conn = RT_NULL;
+    if (!(conn->type & SOCK_DGRAM))
+    {
+        correl_conn = conn->correl_conn;
+        conn->correl_conn = RT_NULL;
+    }
+
     rt_mutex_release(&(conn->conn_lock));
 
     if (correl_conn)
@@ -2178,7 +2191,8 @@ int unix_close(int s)
 
     if (ser_sock)
     {
-        rt_atomic_sub(&(ser_sock->conn_counter), 1);
+        if (rt_atomic_load(&(ser_sock->conn_counter)) > 0)
+            rt_atomic_sub(&(ser_sock->conn_counter), 1);
     }
 
 dfs_out:

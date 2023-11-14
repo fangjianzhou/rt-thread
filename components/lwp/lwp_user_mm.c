@@ -564,6 +564,14 @@ int lwp_munmap(struct rt_lwp *lwp, void *addr, size_t length)
     return lwp_errno_to_posix(ret);
 }
 
+void *lwp_mremap(struct rt_lwp *lwp, void *old_address, size_t old_size,
+                    size_t new_size, int flags, void *new_address)
+{
+    RT_ASSERT(lwp);
+
+    return rt_aspace_mremap_range(lwp->aspace, old_address, old_size, new_size, flags, new_address);
+}
+
 size_t lwp_get_from_user(void *dst, void *src, size_t size)
 {
     struct rt_lwp *lwp = RT_NULL;

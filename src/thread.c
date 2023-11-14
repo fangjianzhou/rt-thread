@@ -100,17 +100,29 @@ static void _thread_exit(void)
     rt_base_t level;
 
     /* get current thread */
-    LOG_D("line:%d thread:%s exit\n",__LINE__,rt_thread_self()->parent.name);
     thread = rt_thread_self();
-    rt_get_thread_struct(thread);
-    rt_thread_defunct_enqueue(thread);
+
+    rt_enter_critical();
+
+    /* remove from schedule */
+    rt_schedule_remove_thread(thread);
+
     level = rt_raw_spin_lock_irqsave(&(thread->spinlock));
+
+    /* remove it from timer list */
     rt_timer_detach(&thread->thread_timer);
-    /* insert to defunct thread list */
-    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
-    LOG_D("line:%d thread:%s exit\n",__LINE__,rt_thread_self()->parent.name);
-    rt_put_thread_struct(thread);
+
+    /* change stat */
     thread->stat = RT_THREAD_CLOSE;
+
+    rt_raw_spin_unlock_irqrestore(&(thread->spinlock), level);
+
+    /* insert to defunct thread list */
+    rt_thread_defunct_enqueue(thread);
+
+    LOG_D("line:%d thread:%s exit\n", __LINE__, rt_thread_self()->parent.name);
+    rt_exit_critical();
+
     /* switch to next task */
     rt_schedule();
 }
@@ -450,6 +462,8 @@ rt_err_t rt_thread_detach(rt_thread_t thread)
     if ((thread->stat & RT_THREAD_STAT_MASK) == RT_THREAD_CLOSE)
         return RT_EOK;
 
+    rt_enter_critical();
+
     if ((thread->stat & RT_THREAD_STAT_MASK) != RT_THREAD_INIT)
     {
         /* remove from schedule */
@@ -480,6 +494,7 @@ rt_err_t rt_thread_detach(rt_thread_t thread)
     /* insert to defunct thread list */
     rt_thread_defunct_enqueue(thread);
 
+    rt_exit_critical();
     return RT_EOK;
 }
 RTM_EXPORT(rt_thread_detach);
@@ -562,6 +577,8 @@ rt_err_t rt_thread_delete(rt_thread_t thread)
     if ((thread->stat & RT_THREAD_STAT_MASK) == RT_THREAD_CLOSE)
         return RT_EOK;
 
+    rt_enter_critical();
+
     if ((thread->stat & RT_THREAD_STAT_MASK) != RT_THREAD_INIT)
     {
         /* remove from schedule */
@@ -589,6 +606,7 @@ rt_err_t rt_thread_delete(rt_thread_t thread)
     /* insert to defunct thread list */
     rt_thread_defunct_enqueue(thread);
 
+    rt_exit_critical();
     return RT_EOK;
 }
 RTM_EXPORT(rt_thread_delete);

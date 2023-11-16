@@ -13,6 +13,7 @@
  * 2023-03-13     WangXiaoyao  Format & fix syscall return value
  * 2023-07-06     Shell        adapt the signal API, and clone, fork to new implementation of lwp signal
  * 2023-07-27     Shell        Move tid_put() from lwp_free() to sys_exit()
+ * 2023-11-16     xqyjlj       fix some syscalls (about sched_*, get/setpriority)
  */
 
 #define _GNU_SOURCE
@@ -924,7 +925,7 @@ sysret_t sys_kill(int pid, int signo)
          * - pid tree (READ. since the lwp is fetch from the pid tree, it must stay there)
          */
         lwp_pid_lock_take();
-        lwp = lwp_from_pid_locked(pid);
+        lwp = lwp_from_pid_raw_locked(pid);
         if (lwp)
         {
             lwp_ref_inc(lwp);
@@ -1009,10 +1010,7 @@ sysret_t sys_getpriority(int which, id_t who)
         struct rt_lwp *lwp = RT_NULL;
 
         lwp_pid_lock_take();
-        if(who == 0)
-            lwp = lwp_self();
-        else
-            lwp = lwp_from_pid_locked(who);
+        lwp = lwp_from_pid_locked(who);
 
         if (lwp)
         {
@@ -1034,10 +1032,7 @@ sysret_t sys_setpriority(int which, id_t who, int prio)
         struct rt_lwp *lwp = RT_NULL;
 
         lwp_pid_lock_take();
-        if(who == 0)
-            lwp = lwp_self();
-        else
-            lwp = lwp_from_pid_locked(who);
+        lwp = lwp_from_pid_locked(who);
 
         if (lwp && prio >= 0 && prio < RT_THREAD_PRIORITY_MAX)
         {
@@ -5416,7 +5411,6 @@ sysret_t sys_sched_getaffinity(const pid_t pid, size_t size, void *set)
     DEF_RETURN_CODE(rc);
     void *mask;
     struct rt_lwp *lwp;
-    rt_bool_t need_release = RT_FALSE;
 
     if (size <= 0 || size > sizeof(cpu_set_t))
     {
@@ -5434,16 +5428,8 @@ sysret_t sys_sched_getaffinity(const pid_t pid, size_t size, void *set)
 
     CPU_ZERO_S(size, mask);
 
-    if (pid == 0)
-    {
-        lwp = lwp_self();
-    }
-    else
-    {
-        need_release = RT_TRUE;
-        lwp_pid_lock_take();
-        lwp = lwp_from_pid_locked(pid);
-    }
+    lwp_pid_lock_take();
+    lwp = lwp_from_pid_locked(pid);
 
     if (!lwp)
     {
@@ -5474,8 +5460,7 @@ sysret_t sys_sched_getaffinity(const pid_t pid, size_t size, void *set)
             rc = size;
     }
 
-    if (need_release)
-        lwp_pid_lock_release();
+    lwp_pid_lock_release();
 
     kmem_put(mask);
 
@@ -5531,12 +5516,10 @@ sysret_t sys_sysinfo(void *info)
 #endif
 }
 
-sysret_t sys_sched_setparam(pid_t pid, void *param)
+sysret_t sys_sched_setparam(pid_t tid, void *param)
 {
     struct sched_param *sched_param = RT_NULL;
-    struct rt_lwp *lwp = NULL;
-    rt_thread_t main_thread;
-    rt_bool_t need_release = RT_FALSE;
+    rt_thread_t thread;
     int ret = -1;
 
     if (!lwp_user_accessable(param, sizeof(struct sched_param)))
@@ -5556,25 +5539,14 @@ sysret_t sys_sched_setparam(pid_t pid, void *param)
         return -EINVAL;
     }
 
-    if (pid > 0)
+    thread = lwp_tid_get_thread_and_inc_ref(tid);
+
+    if (thread)
     {
-        need_release = RT_TRUE;
-        lwp_pid_lock_take();
-        lwp = lwp_from_pid_locked(pid);
-    }
-    else if (pid == 0)
-    {
-        lwp = lwp_self();
+        ret = rt_thread_control(thread, RT_THREAD_CTRL_CHANGE_PRIORITY, (void *)&sched_param->sched_priority);
     }
 
-    if (lwp)
-    {
-        main_thread = rt_list_entry(lwp->t_grp.prev, struct rt_thread, sibling);
-        if (need_release)
-            lwp_pid_lock_release();
-
-        ret = rt_thread_control(main_thread, RT_THREAD_CTRL_CHANGE_PRIORITY, (void *)&sched_param->sched_priority);
-    }
+    lwp_tid_dec_ref(thread);
 
     kmem_put(sched_param);
 
@@ -5587,13 +5559,11 @@ sysret_t sys_sched_yield(void)
     return 0;
 }
 
-sysret_t sys_sched_getparam(const pid_t pid, void *param)
+sysret_t sys_sched_getparam(const pid_t tid, void *param)
 {
     struct sched_param *sched_param = RT_NULL;
-    struct rt_lwp *lwp = NULL;
-    rt_thread_t main_thread;
+    rt_thread_t thread;
     int ret = -1;
-    rt_bool_t need_release = RT_FALSE;
 
     if (!lwp_user_accessable(param, sizeof(struct sched_param)))
     {
@@ -5606,26 +5576,15 @@ sysret_t sys_sched_getparam(const pid_t pid, void *param)
         return -ENOMEM;
     }
 
-    if (pid > 0)
-    {
-        need_release = RT_TRUE;
-        lwp_pid_lock_take();
-        lwp = lwp_from_pid_locked(pid);
-    }
-    else if (pid == 0)
-    {
-        lwp = lwp_self();
-    }
+    thread = lwp_tid_get_thread_and_inc_ref(tid);
 
-    if (lwp)
+    if (thread)
     {
-        main_thread = rt_list_entry(lwp->t_grp.prev, struct rt_thread, sibling);
-        if (need_release)
-            lwp_pid_lock_release();
-
-        sched_param->sched_priority = main_thread->current_priority;
+        sched_param->sched_priority = thread->current_priority;
         ret = 0;
     }
+
+    lwp_tid_dec_ref(thread);
 
     lwp_put_to_user((void *)param, sched_param, sizeof(struct sched_param));
     kmem_put(sched_param);
@@ -5685,37 +5644,24 @@ sysret_t sys_sched_setscheduler(int tid, int policy, void *param)
     return ret;
 }
 
-sysret_t sys_sched_getscheduler(int tid, int *policy, void *param)
+sysret_t sys_sched_getscheduler(int tid)
 {
-    struct sched_param *sched_param = RT_NULL;
     rt_thread_t thread = RT_NULL;
-
-    if (!lwp_user_accessable(param, sizeof(struct sched_param)))
-    {
-        return -EFAULT;
-    }
-
-    sched_param = kmem_get(sizeof(struct sched_param));
-    if (sched_param == RT_NULL)
-    {
-        return -ENOMEM;
-    }
-
-    if (lwp_get_from_user(sched_param, param, sizeof(struct sched_param)) != sizeof(struct sched_param))
-    {
-        kmem_put(sched_param);
-        return -EINVAL;
-    }
+    int rtn;
 
     thread = lwp_tid_get_thread_and_inc_ref(tid);
-    sched_param->sched_priority = thread->current_priority;
     lwp_tid_dec_ref(thread);
 
-    lwp_put_to_user((void *)param, sched_param, sizeof(struct sched_param));
-    kmem_put(sched_param);
+    if (thread)
+    {
+        rtn = SCHED_RR;
+    }
+    else
+    {
+        rtn = -ESRCH;
+    }
 
-    *policy = 0;
-    return 0;
+    return rtn;
 }
 
 sysret_t sys_fsync(int fd)

@@ -184,7 +184,7 @@ void lwp_tid_put(int tid);
  * @return rt_thread_t
  */
 rt_thread_t lwp_tid_get_thread_and_inc_ref(int tid);
-
+rt_thread_t lwp_tid_get_thread_raw(int tid);
 /**
  * @brief Decrease a reference count
  *

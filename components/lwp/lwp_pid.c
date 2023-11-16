@@ -14,6 +14,7 @@
  *                             error
  * 2023-10-27     shell        Format codes of sys_exit(). Fix the data racing where lock is missed
  *                             Add reference on pid/tid, so the resource is not freed while using.
+ * 2023-11-16     xqyjlj       Fix the case where pid is 0
  */
 
 #include <rthw.h>
@@ -509,13 +510,6 @@ void lwp_free(struct rt_lwp* lwp)
 rt_inline rt_noreturn
 void _thread_exit(rt_lwp_t lwp, rt_thread_t thread)
 {
-    /**
-     * Note: the tid tree always hold a reference to thread, hence the tid must
-     * be release before cleanup of thread
-     */
-    lwp_tid_put(thread->tid);
-    thread->tid = 0;
-
     LWP_LOCK(lwp);
     lwp->rt_rusage.ru_stime.tv_sec += thread->system_time / RT_TICK_PER_SECOND;
     lwp->rt_rusage.ru_stime.tv_usec += thread->system_time % RT_TICK_PER_SECOND * RT_TICK_PER_SECOND;
@@ -524,6 +518,14 @@ void _thread_exit(rt_lwp_t lwp, rt_thread_t thread)
     rt_list_remove(&thread->sibling);
     LWP_UNLOCK(lwp);
     lwp_futex_exit_robust_list(thread);
+
+    /**
+     * Note: the tid tree always hold a reference to thread, hence the tid must
+     * be release before cleanup of thread
+     */
+    lwp_tid_put(thread->tid);
+    thread->tid = 0;
+
     rt_thread_delete(thread);
     rt_schedule();
     while (1) ;
@@ -538,7 +540,7 @@ rt_inline void _clear_child_tid(rt_thread_t thread)
 
         thread->clear_child_tid = RT_NULL;
         lwp_put_to_user(clear_child_tid, &t, sizeof t);
-        sys_futex(clear_child_tid, FUTEX_WAKE | FUTEX_PRIVATE, 1, RT_NULL, RT_NULL, 0);
+        sys_futex(clear_child_tid, FUTEX_WAKE, 1, RT_NULL, RT_NULL, 0);
     }
 }
 
@@ -698,7 +700,7 @@ int lwp_ref_dec(struct rt_lwp *lwp)
     return ref;
 }
 
-struct rt_lwp* lwp_from_pid_locked(pid_t pid)
+struct rt_lwp* lwp_from_pid_raw_locked(pid_t pid)
 {
     struct lwp_avl_struct *p;
     struct rt_lwp *lwp = RT_NULL;
@@ -709,6 +711,13 @@ struct rt_lwp* lwp_from_pid_locked(pid_t pid)
         lwp = (struct rt_lwp *)p->data;
     }
 
+    return lwp;
+}
+
+struct rt_lwp* lwp_from_pid_locked(pid_t pid)
+{
+    struct rt_lwp* lwp;
+    lwp = pid ? lwp_from_pid_raw_locked(pid) : lwp_self();
     return lwp;
 }
 
@@ -895,7 +904,7 @@ pid_t lwp_waitpid(const pid_t pid, int *status, int options, struct rusage *ru)
         if (pid > 0)
         {
             lwp_pid_lock_take();
-            child = lwp_from_pid_locked(pid);
+            child = lwp_from_pid_raw_locked(pid);
             if (child->parent != self_lwp)
                 rc = -RT_ERROR;
             else
@@ -1094,7 +1103,7 @@ static void cmd_kill(int argc, char** argv)
         }
     }
     lwp_pid_lock_take();
-    lwp_signal_kill(lwp_from_pid_locked(pid), sig, SI_USER, 0);
+    lwp_signal_kill(lwp_from_pid_raw_locked(pid), sig, SI_USER, 0);
     lwp_pid_lock_release();
 }
 MSH_CMD_EXPORT_ALIAS(cmd_kill, kill, send a signal to a process);
@@ -1111,7 +1120,7 @@ static void cmd_killall(int argc, char** argv)
     while((pid = lwp_name2pid(argv[1])) > 0)
     {
         lwp_pid_lock_take();
-        lwp_signal_kill(lwp_from_pid_locked(pid), SIGKILL, SI_USER, 0);
+        lwp_signal_kill(lwp_from_pid_raw_locked(pid), SIGKILL, SI_USER, 0);
         lwp_pid_lock_release();
         rt_thread_mdelay(100);
     }
@@ -1264,9 +1273,9 @@ static void _wait_sibling_exit(rt_lwp_t lwp, rt_thread_t curr_thread)
         {
             thread->exit_request = LWP_EXIT_REQUEST_TRIGGERED;
         }
-        rt_spin_unlock_irqrestore(&thread->spinlock, level);
 
-        level = rt_spin_lock_irqsave(&thread->spinlock);
+        /* dont release, otherwise thread may have been freed */
+
         if ((thread->stat & RT_THREAD_SUSPEND_MASK) == RT_THREAD_SUSPEND_MASK)
         {
             thread->error = RT_EINTR;
@@ -1445,10 +1454,8 @@ static int _lwp_setaffinity(pid_t pid, int cpu)
     int ret = -1;
 
     lwp_pid_lock_take();
-    if(pid == 0)
-        lwp = lwp_self();
-    else
-        lwp = lwp_from_pid_locked(pid);
+    lwp = lwp_from_pid_locked(pid);
+
     if (lwp)
     {
 #ifdef RT_USING_SMP

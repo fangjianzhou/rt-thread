@@ -977,6 +977,13 @@ size_t lwp_user_strlen(const char *s)
     return lwp_user_strlen_ext(lwp, s);
 }
 
+size_t lwp_strlen(struct rt_lwp *lwp, const char *s)
+{
+    if (_in_user_space(s))
+        return lwp_user_strlen_ext(lwp, s);
+    else
+        return strlen(s);
+}
 
 char** lwp_get_command_line_args(struct rt_lwp *lwp)
 {

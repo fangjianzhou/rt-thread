@@ -163,6 +163,7 @@ rt_base_t lwp_brk(void *addr);
 
 size_t lwp_user_strlen(const char *s);
 size_t lwp_user_strlen_ext(struct rt_lwp *lwp, const char *s);
+size_t lwp_strlen(struct rt_lwp *lwp, const char *s);
 
 int lwp_fork_aspace(struct rt_lwp *dest_lwp, struct rt_lwp *src_lwp);
 

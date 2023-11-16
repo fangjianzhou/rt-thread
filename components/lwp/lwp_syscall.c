@@ -2167,7 +2167,7 @@ static char *_insert_args(int new_argc, char *new_argv[], struct lwp_args_info *
     nsize = new_argc * sizeof(char *);
     for (i = 0; i < new_argc; i++)
     {
-        nsize += lwp_user_strlen(new_argv[i]) + 1;
+        nsize += lwp_strlen(lwp_self(), new_argv[i]) + 1;
     }
     if (nsize + args->size > ARCH_PAGE_SIZE)
     {
@@ -2181,7 +2181,7 @@ static char *_insert_args(int new_argc, char *new_argv[], struct lwp_args_info *
     for (i = 0; i < new_argc; i++)
     {
         nargv[i] = p;
-        len = lwp_user_strlen(new_argv[i]) + 1;
+        len = lwp_strlen(lwp_self(), new_argv[i]) + 1;
         lwp_memcpy(p, new_argv[i], len);
         p += len;
     }
@@ -2190,7 +2190,7 @@ static char *_insert_args(int new_argc, char *new_argv[], struct lwp_args_info *
     for (i = 0; i < args->argc; i++)
     {
         nargv[i] = p;
-        len = lwp_user_strlen(args->argv[i]) + 1;
+        len = lwp_strlen(lwp_self(), args->argv[i]) + 1;
         lwp_memcpy(p, args->argv[i], len);
         p += len;
     }
@@ -2199,7 +2199,7 @@ static char *_insert_args(int new_argc, char *new_argv[], struct lwp_args_info *
     for (i = 0; i < args->envc; i++)
     {
         nenvp[i] = p;
-        len = lwp_user_strlen(args->envp[i]) + 1;
+        len = lwp_strlen(lwp_self(), args->envp[i]) + 1;
         lwp_memcpy(p, args->envp[i], len);
         p += len;
     }
@@ -2348,7 +2348,7 @@ int load_ldso(struct rt_lwp *lwp, char *exec_name, char *const argv[], char *con
             {
                 break;
             }
-            len = lwp_user_strlen_ext(lwp, (const char *)argv[argc]);
+            len = lwp_strlen(lwp, (const char *)argv[argc]);
             size += sizeof(char *) + len + 1;
             argc++;
         }
@@ -2361,7 +2361,7 @@ int load_ldso(struct rt_lwp *lwp, char *exec_name, char *const argv[], char *con
             {
                 break;
             }
-            len = lwp_user_strlen_ext(lwp, (const char *)envp[envc]);
+            len = lwp_strlen(lwp, (const char *)envp[envc]);
             size += sizeof(char *) + len + 1;
             envc++;
         }
@@ -2382,7 +2382,7 @@ int load_ldso(struct rt_lwp *lwp, char *exec_name, char *const argv[], char *con
         for (i = 0; i < argc; i++)
         {
             kargv[i] = p;
-            len = lwp_user_strlen_ext(lwp, argv[i]) + 1;
+            len = lwp_strlen(lwp, argv[i]) + 1;
             lwp_memcpy(p, argv[i], len);
             p += len;
         }
@@ -2394,7 +2394,7 @@ int load_ldso(struct rt_lwp *lwp, char *exec_name, char *const argv[], char *con
         for (i = 0; i < envc; i++)
         {
             kenvp[i] = p;
-            len = lwp_user_strlen_ext(lwp, envp[i]) + 1;
+            len = lwp_strlen(lwp, envp[i]) + 1;
             lwp_memcpy(p, envp[i], len);
             p += len;
         }
@@ -4611,7 +4611,7 @@ sysret_t sys_gethostbyname2_r(const char *name, int af, struct hostent *ret,
 
         rt_strncpy(ptr, k_name, buflen - (ptr - buf));
         ret->h_name = ptr;
-        ptr += lwp_user_strlen(k_name);
+        ptr += strlen(k_name);
 
         ret->h_addr_list = (char**)ptr;
         ptr += cnt * sizeof(char *);

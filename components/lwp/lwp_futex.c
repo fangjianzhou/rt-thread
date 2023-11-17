@@ -13,7 +13,7 @@
  * 2023-11-03     Shell        Add Support for ~FUTEX_PRIVATE
  * 2023-11-16     xqyjlj       Add Support for futex requeue and futex pi
  */
-
+#include "stdatomic.h"
 #include "lwp_futex_internal.h"
 #include "sys/time.h"
 

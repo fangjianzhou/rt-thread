@@ -9,6 +9,7 @@
  * 2019-10-12     Jesven       Add MMU and userspace support
  * 2020-10-08     Bernard      Architecture and code cleanup
  * 2021-08-26     linzhenxing  add lwp_setcwd\lwp_getcwd
+ * 2023-11-17     xqyjlj       add process group and session support
  */
 
 /*
@@ -82,6 +83,29 @@ struct rt_lwp_notify
 #error "No compatible lwp set status provided for this libc"
 #endif
 
+typedef struct rt_lwp *rt_lwp_t;
+typedef struct rt_session *rt_session_t;
+typedef struct rt_processgroup *rt_processgroup_t;
+
+struct rt_session {
+    struct rt_object    object;
+    rt_processgroup_t   leader;
+    rt_list_t           processgroup;
+    pid_t               sid;
+    pid_t               foreground_pgid;
+    struct rt_mutex     mutex;
+};
+
+struct rt_processgroup {
+    struct rt_object    object;
+    rt_lwp_t            leader;
+    rt_list_t           process;
+    rt_list_t           node;
+    pid_t               pgid;
+    pid_t               sid;
+    struct rt_mutex     mutex;
+};
+
 struct rt_lwp
 {
 #ifdef ARCH_MM_MMU
@@ -100,9 +124,9 @@ struct rt_lwp
     uint8_t lwp_type;
     uint8_t reserv[3];
 
-    struct rt_lwp *parent;
-    struct rt_lwp *first_child;
-    struct rt_lwp *sibling;
+    struct rt_lwp *parent;          /* parent process */
+    struct rt_lwp *first_child;     /* first child process */
+    struct rt_lwp *sibling;         /* sibling(child) process */
 
     rt_list_t wait_list;
     rt_bool_t terminated;
@@ -118,11 +142,15 @@ struct rt_lwp
     void *args;
     uint32_t args_length;
     pid_t pid;
-    pid_t __pgrp; /*Accessed via process_group()*/
+    pid_t __pgrp;                   /*Accessed via process_group()*/
     pid_t tty_old_pgrp;
-    pid_t session;
-    rt_list_t t_grp;
-    rt_list_t timer; /* POSIX timer object binding to a process */
+    pid_t session;                  /**< maybe need delete */
+    pid_t sid;                      /* session ID */
+    pid_t pgid;                     /* process group ID */
+    rt_list_t pgrp_node;            /* process group node */
+    rt_bool_t did_exec;             /* Whether exec has been performed */
+    rt_list_t t_grp;                /* thread group */
+    rt_list_t timer;                /* POSIX timer object binding to a process */
 
     int leader; /* boolean value for session group_leader*/
     struct dfs_fdtable fdt;
@@ -154,7 +182,7 @@ struct rt_lwp
 #endif
     struct rusage rt_rusage;
 };
-typedef struct rt_lwp *rt_lwp_t;
+
 
 struct rt_lwp *lwp_self(void);
 rt_err_t lwp_children_register(struct rt_lwp *parent, struct rt_lwp *child);
@@ -216,49 +244,53 @@ rt_err_t lwp_futex_init(void);
 rt_err_t lwp_futex(struct rt_lwp *lwp, int *uaddr, int op, int val,
                    const struct timespec *timeout, int *uaddr2, int val3);
 
-#ifdef ARCH_MM_MMU
-struct __pthread {
-    /* Part 1 -- these fields may be external or
-     *      * internal (accessed via asm) ABI. Do not change. */
-    struct pthread *self;
-    uintptr_t *dtv;
-    struct pthread *prev, *next; /* non-ABI */
-    uintptr_t sysinfo;
-    uintptr_t canary, canary2;
+/* processgroup api */
+pid_t lwp_pgid_get_bypgrp(rt_processgroup_t group);
+pid_t lwp_pgid_get_byprocess(rt_lwp_t process);
+rt_processgroup_t lwp_pgrp_find(pid_t pgid);
+rt_processgroup_t lwp_pgrp_create(rt_lwp_t leader);
+int lwp_pgrp_delete(rt_processgroup_t group);
+int lwp_pgrp_insert(rt_processgroup_t group, rt_lwp_t process);
+int lwp_pgrp_remove(rt_processgroup_t group, rt_lwp_t process);
+int lwp_pgrp_move(rt_processgroup_t group, rt_lwp_t process);
+int lwp_pgrp_update_children_info(rt_processgroup_t group, pid_t sid, pid_t pgid);
 
-    /* Part 2 -- implementation details, non-ABI. */
-    int tid;
-    int errno_val;
-    volatile int detach_state;
-    volatile int cancel;
-    volatile unsigned char canceldisable, cancelasync;
-    unsigned char tsd_used:1;
-    unsigned char dlerror_flag:1;
-    unsigned char *map_base;
-    size_t map_size;
-    void *stack;
-    size_t stack_size;
-    size_t guard_size;
-    void *result;
-    struct __ptcb *cancelbuf;
-    void **tsd;
-    struct {
-        volatile void *volatile head;
-        long off;
-        volatile void *volatile pending;
-    } robust_list;
-    volatile int timer_id;
-    locale_t locale;
-    volatile int killlock[1];
-    char *dlerror_buf;
-    void *stdio_locks;
+/* session api */
+rt_inline pid_t lwp_sid_get_bysession(rt_session_t session)
+{
+    return session ? session->sid : 0;
+}
 
-    /* Part 3 -- the positions of these fields relative to
-     *      * the end of the structure is external and internal ABI. */
-    uintptr_t canary_at_end;
-    uintptr_t *dtv_copy;
-};
-#endif
+rt_inline pid_t lwp_sid_get_bypgrp(rt_processgroup_t group)
+{
+    return group ? group->sid : 0;
+}
+
+rt_inline pid_t lwp_sid_get_byprocess(rt_lwp_t process)
+{
+    return process ? process->sid : 0;
+}
+
+rt_session_t lwp_session_find(pid_t sid);
+rt_session_t lwp_session_create(rt_processgroup_t leader);
+int lwp_session_delete(rt_session_t session);
+
+/**
+ * Note: all the session operation must be called in the context where
+ * process lock is taken. This is protect us from a possible dead lock condition
+ *
+ * The order is mandatory in the case:
+ *      PGRP_LOCK(pgrp);
+ *      LWP_LOCK(p);
+ *      ... bussiness logic
+ *      LWP_UNLOCK(p);
+ *      PGRP_UNLOCK(pgrp);
+ */
+int lwp_session_insert(rt_session_t session, rt_processgroup_t group);
+int lwp_session_remove(rt_session_t session, rt_processgroup_t group);
+int lwp_session_move(rt_session_t session, rt_processgroup_t group);
+int lwp_session_update_children_info(rt_session_t session, pid_t sid);
+int lwp_session_set_foreground(rt_session_t session, pid_t pgid);
 
 #ifdef __cplusplus
 }

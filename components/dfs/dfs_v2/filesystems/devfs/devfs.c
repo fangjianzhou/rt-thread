@@ -295,7 +295,7 @@ int dfs_devfs_ioctl(struct dfs_file *file, int cmd, void *args)
 
 ssize_t dfs_devfs_read(struct dfs_file *file, void *buf, size_t count, off_t *pos)
 {
-    int result;
+    int result = -RT_EIO;
     rt_device_t device;
 
     RT_ASSERT(file != RT_NULL);
@@ -327,7 +327,7 @@ ssize_t dfs_devfs_read(struct dfs_file *file, void *buf, size_t count, off_t *po
 
 ssize_t dfs_devfs_write(struct dfs_file *file, const void *buf, size_t count, off_t *pos)
 {
-    int result;
+    int result = -RT_EIO;
     rt_device_t device;
 
     RT_ASSERT(file != RT_NULL);

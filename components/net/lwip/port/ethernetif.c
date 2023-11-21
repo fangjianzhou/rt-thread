@@ -1503,7 +1503,7 @@ int vlan_ioctl_handler(void *arg)
     struct eth_device *eth_dev = RT_NULL;
     struct eth_device *vlan_dev = RT_NULL;
     char eth_name[RT_NAME_MAX], vlan_name[RT_NAME_MAX];
-    struct ip4_addr ipaddr, netmask, gw;
+    // struct ip4_addr ipaddr, netmask, gw;
 
     if (!lwp_user_accessable((void *)arg, sizeof(args)))
     {

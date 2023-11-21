@@ -160,8 +160,8 @@ void rt_spin_unlock_irqrestore(struct rt_spinlock *lock, rt_base_t level)
     lock->pc = RT_NULL;
 #endif /* RT_DEBUGING_SPINLOCK */
     rt_hw_spin_unlock(&lock->lock);
-    rt_exit_critical();
     rt_hw_local_irq_enable(level);
+    rt_exit_critical();
 }
 RTM_EXPORT(rt_spin_unlock_irqrestore)
 
@@ -209,6 +209,161 @@ void rt_raw_spin_unlock_irqrestore(struct rt_spinlock *lock, rt_base_t level)
     rt_hw_local_irq_enable(level);
 }
 RTM_EXPORT(rt_raw_spin_unlock_irqrestore)
+
+/**
+ * @brief   Initialize a static spinlock object.
+ *
+ * @param   lock is a pointer to the spinlock to initialize.
+ */
+void rt_spin_lock_nested_init(struct rt_spinlock_nested *lock)
+{
+    rt_hw_spin_lock_init(&lock->lock);
+    rt_atomic_store(&(lock->lock_nested), 0);
+    lock->thread = RT_NULL;
+}
+RTM_EXPORT(rt_spin_lock_nested_init)
+
+/**
+ * @brief   This function will disable the local interrupt and then lock the spinlock, will lock the thread scheduler.
+ *
+ * @note    If the spinlock is locked, the current CPU will keep polling the spinlock state
+ *          until the spinlock is unlocked.
+ *
+ * @param   lock is a pointer to the spinlock.
+ *
+ * @return  Return current cpu interrupt status.
+ */
+rt_base_t rt_spin_lock_irqsave_nested(struct rt_spinlock_nested *lock)
+{
+    rt_base_t level;
+    struct rt_cpu *pcpu;
+
+    level = rt_hw_local_irq_disable();
+    rt_enter_critical();
+    pcpu = rt_cpu_self();
+
+    if (pcpu && pcpu->current_thread != RT_NULL)
+    {
+        register rt_ubase_t lock_nested = rt_atomic_load(&(lock->lock_nested));
+
+        if (lock_nested == 0 || lock->thread != pcpu->current_thread)
+        {
+            rt_hw_spin_lock(&lock->lock);
+            lock->thread = pcpu->current_thread;
+#if defined(RT_DEBUGING_SPINLOCK)
+            lock->owner = pcpu->current_thread;
+            lock->pc = __GET_RETURN_ADDRESS;
+#endif /* RT_DEBUGING_SPINLOCK */
+        }
+        rt_atomic_add(&(lock->lock_nested), 1);
+    }
+
+    return level;
+}
+RTM_EXPORT(rt_spin_lock_irqsave_nested)
+
+/**
+ * @brief   This function will unlock the spinlock and then restore current cpu interrupt status, will unlock the thread scheduler.
+ *
+ * @param   lock is a pointer to the spinlock.
+ *
+ * @param   level is interrupt status returned by rt_spin_lock_irqsave().
+ */
+void rt_spin_unlock_irqrestore_nested(struct rt_spinlock_nested *lock, rt_base_t level)
+{
+    struct rt_cpu *pcpu = rt_cpu_self();
+
+    if (pcpu && pcpu->current_thread != RT_NULL)
+    {
+        register rt_ubase_t lock_nested;
+
+        rt_atomic_sub(&(lock->lock_nested), 1);
+        lock_nested = rt_atomic_load(&(lock->lock_nested));
+
+        if (lock_nested == 0)
+        {
+#if defined(RT_DEBUGING_SPINLOCK)
+            lock->owner = __OWNER_MAGIC;
+            lock->pc = RT_NULL;
+#endif /* RT_DEBUGING_SPINLOCK */
+            lock->thread = RT_NULL;
+            rt_hw_spin_unlock(&lock->lock);
+        }
+    }
+    rt_hw_local_irq_enable(level);
+    rt_exit_critical();
+}
+RTM_EXPORT(rt_spin_unlock_irqrestore_nested)
+
+/**
+ * @brief   This function will disable the local interrupt and then lock the spinlock.
+ *
+ * @note    If the spinlock is locked, the current CPU will keep polling the spinlock state
+ *          until the spinlock is unlocked.
+ *
+ * @param   lock is a pointer to the spinlock.
+ *
+ * @return  Return current cpu interrupt status.
+ */
+rt_base_t rt_raw_spin_lock_irqsave_nested(struct rt_spinlock_nested *lock)
+{
+    rt_base_t level;
+    struct rt_cpu *pcpu;
+
+    level = rt_hw_local_irq_disable();
+    pcpu = rt_cpu_self();
+
+    if (pcpu && pcpu->current_thread != RT_NULL)
+    {
+        register rt_ubase_t lock_nested = rt_atomic_load(&(lock->lock_nested));
+
+        if (lock_nested == 0 || lock->thread != pcpu->current_thread)
+        {
+            rt_hw_spin_lock(&lock->lock);
+            lock->thread = pcpu->current_thread;
+#if defined(RT_DEBUGING_SPINLOCK)
+            lock->owner = pcpu->current_thread;
+            lock->pc = __GET_RETURN_ADDRESS;
+#endif /* RT_DEBUGING_SPINLOCK */
+        }
+        rt_atomic_add(&(lock->lock_nested), 1);
+    }
+
+    return level;
+}
+RTM_EXPORT(rt_raw_spin_lock_irqsave_nested)
+
+/**
+ * @brief   This function will unlock the spinlock and then restore current cpu interrupt status.
+ *
+ * @param   lock is a pointer to the spinlock.
+ *
+ * @param   level is interrupt status returned by rt_raw_spin_lock_irqsave().
+ */
+void rt_raw_spin_unlock_irqrestore_nested(struct rt_spinlock_nested *lock, rt_base_t level)
+{
+    struct rt_cpu *pcpu = rt_cpu_self();
+
+    if (pcpu && pcpu->current_thread != RT_NULL)
+    {
+        register rt_ubase_t lock_nested;
+
+        rt_atomic_sub(&(lock->lock_nested), 1);
+        lock_nested = rt_atomic_load(&(lock->lock_nested));
+
+        if (lock_nested == 0)
+        {
+#if defined(RT_DEBUGING_SPINLOCK)
+            lock->owner = __OWNER_MAGIC;
+            lock->pc = RT_NULL;
+#endif /* RT_DEBUGING_SPINLOCK */
+            lock->thread = RT_NULL;
+            rt_hw_spin_unlock(&lock->lock);
+        }
+    }
+    rt_hw_local_irq_enable(level);
+}
+RTM_EXPORT(rt_raw_spin_unlock_irqrestore_nested)
 
 /**
  * @brief   This fucntion will return current cpu object.

@@ -534,6 +534,13 @@ void rt_raw_spin_lock(struct rt_spinlock *lock);
 void rt_raw_spin_unlock(struct rt_spinlock *lock);
 rt_base_t rt_raw_spin_lock_irqsave(struct rt_spinlock *lock);
 void rt_raw_spin_unlock_irqrestore(struct rt_spinlock *lock, rt_base_t level);
+
+void rt_spin_lock_nested_init(struct rt_spinlock_nested *lock);
+rt_base_t rt_spin_lock_irqsave_nested(struct rt_spinlock_nested *lock);
+void rt_spin_unlock_irqrestore_nested(struct rt_spinlock_nested *lock, rt_base_t level);
+rt_base_t rt_raw_spin_lock_irqsave_nested(struct rt_spinlock_nested *lock);
+void rt_raw_spin_unlock_irqrestore_nested(struct rt_spinlock_nested *lock, rt_base_t level);
+
 #else
 #define rt_spin_lock_init(lock)                                         do {RT_UNUSED(lock);} while (0)
 #define rt_spin_lock(lock)                                              do {RT_UNUSED(lock); rt_enter_critical();} while (0)
@@ -544,6 +551,13 @@ rt_inline rt_base_t rt_spin_lock_irqsave(struct rt_spinlock *lock)      {RT_UNUS
 #define rt_raw_spin_unlock(lock)                                        do {RT_UNUSED(lock);} while (0)
 rt_inline rt_base_t rt_raw_spin_lock_irqsave(struct rt_spinlock *lock)  {RT_UNUSED(lock);return rt_hw_interrupt_disable();}
 #define rt_raw_spin_unlock_irqrestore(lock, level)                      do {RT_UNUSED(lock); rt_hw_interrupt_enable(level);} while (0)
+
+#define rt_spin_lock_nested_init(lock)                                                  do {RT_UNUSED(lock);} while (0)
+rt_inline rt_base_t rt_spin_lock_irqsave_nested(struct rt_spinlock_nested *lock)        {RT_UNUSED(lock);return rt_hw_interrupt_disable();}
+#define rt_spin_unlock_irqrestore_nested(lock, level)                                   do {RT_UNUSED(lock); rt_hw_interrupt_enable(level);} while (0)
+rt_inline rt_base_t rt_raw_spin_lock_irqsave_nested(struct rt_spinlock_nested *lock)    {RT_UNUSED(lock);return rt_hw_interrupt_disable();}
+#define rt_raw_spin_unlock_irqrestore_nested(lock, level)                               do {RT_UNUSED(lock); rt_hw_interrupt_enable(level);} while (0)
+
 #endif /* RT_USING_SMP */
 
 /**@}*/

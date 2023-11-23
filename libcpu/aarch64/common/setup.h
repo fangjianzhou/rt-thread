@@ -19,4 +19,6 @@
 
 void rt_hw_common_setup(void);
 
+int rt_hw_uart_init(void);
+
 #endif /* __SETUP_H__ */

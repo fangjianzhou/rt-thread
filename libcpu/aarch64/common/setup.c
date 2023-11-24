@@ -44,6 +44,7 @@ extern void *system_vectors;
 
 static void *fdt_ptr = RT_NULL;
 static rt_size_t fdt_size = 0;
+static rt_uint64_t initrd_ranges[3] = { };
 
 #ifdef RT_USING_SMP
 extern struct cpu_ops_t cpu_psci_ops;
@@ -226,6 +227,10 @@ void rt_hw_common_setup(void)
         RT_ASSERT(0);
     }
 
+    rt_fdt_scan_chosen_stdout();
+    
+    rt_fdt_scan_initrd(initrd_ranges);
+
     rt_fdt_scan_memory();
 
     if (memheap_start && memheap_end)
@@ -317,6 +322,8 @@ void rt_hw_common_setup(void)
 
         rt_hw_mmu_setup(&rt_kernel_space, &platform_mem_desc, 1);
 
+        rt_fdt_earlycon_kick(FDT_EARLYCON_KICK_UPDATE);
+
         mem_region = usable_mem_region;
 
         for (int i = 0; i < mem_region_nr; ++i, ++mem_region)
@@ -334,6 +341,7 @@ void rt_hw_common_setup(void)
 
     /* initialize hardware interrupt */
     rt_hw_interrupt_init();
+
     /* initialize uart */
     rt_hw_uart_init();
 
@@ -348,7 +356,6 @@ void rt_hw_common_setup(void)
     rt_ofw_console_setup();
 #endif
 
-    
     rt_thread_idle_sethook(rt_hw_idle_wfi);
 
 #ifdef RT_USING_SMP

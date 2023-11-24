@@ -3597,7 +3597,7 @@ sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
 
         /* LWIPPTP_SWREQ_0036 */
         ret = sendmsg(socket, &kmsg, flgs);
-
+        ret = (ret < 0 ? GET_ERRNO() : ret);
         kmem_put(kmsg.msg_iov->iov_base);
         kmem_put(kmsg.msg_iov);
     }
@@ -3605,14 +3605,14 @@ sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
     rt_memcpy(&kmsg, msg, sizeof(kmsg));
 
     ret = sendmsg(socket, &kmsg, flgs);
-
+    ret = (ret < 0 ? GET_ERRNO() : ret);
     if (!ret)
     {
         msg->msg_flags = kmsg.msg_flags;
     }
 #endif /* ARCH_MM_MMU */
 
-    return (ret < 0 ? GET_ERRNO() : ret);
+    return ret;
 }
 
 /* LWIPPTP_SWREQ_0037 */
@@ -3642,6 +3642,7 @@ sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
 
         if (ret < 0)
         {
+            ret = (ret < 0 ? GET_ERRNO() : ret);
             goto _free_res;
         }
 
@@ -3667,14 +3668,14 @@ sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
     rt_memcpy(&kmsg, msg, sizeof(kmsg));
 
     ret = recvmsg(socket, &kmsg, flgs);
-
+    ret = (ret < 0 ? GET_ERRNO() : ret);
     if (!ret)
     {
         msg->msg_flags = kmsg.msg_flags;
     }
 #endif /* ARCH_MM_MMU */
 
-    return (ret < 0 ? GET_ERRNO() : ret);
+    return ret;
 }
 
 sysret_t sys_recvfrom(int socket, void *mem, size_t len, int flags,

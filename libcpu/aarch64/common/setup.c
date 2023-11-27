@@ -70,12 +70,12 @@ static struct rt_ofw_node *cpu_np[RT_CPUS_NR] = { };
 
 void rt_hw_fdt_install_early(void *fdt)
 {
-    void *fdt_vaddr = fdt - PV_OFFSET;
+    //void *fdt_vaddr = fdt - PV_OFFSET;
 
-    if (fdt != RT_NULL && !fdt_check_header(fdt_vaddr))
+    if (fdt != RT_NULL && !fdt_check_header(fdt))
     {
         fdt_ptr = fdt;
-        fdt_size = fdt_totalsize(fdt_vaddr);
+        fdt_size = fdt_totalsize(fdt);
     }
 }
 
@@ -170,9 +170,9 @@ void rt_hw_common_setup(void)
     void *kernel_start, *kernel_end, *memheap_start = RT_NULL, *memheap_end = RT_NULL;
 
 #ifdef RT_USING_SMART
-    rt_hw_mmu_map_init(&rt_kernel_space, (void*)0xfffffffff0000000, 0x10000000, MMUTable, PV_OFFSET);
+    rt_hw_mmu_map_init(&rt_kernel_space, (void*)0xfffffffff0000000, 0x10000000, MMUTable);
 #else
-    rt_hw_mmu_map_init(&rt_kernel_space, (void*)0xffffd0000000, 0x10000000, MMUTable, 0);
+    rt_hw_mmu_map_init(&rt_kernel_space, (void*)0xffffd0000000, 0x10000000, MMUTable);
 #endif
 
     kernel_start = rt_kmem_v2p((void *)&_start) - 64;

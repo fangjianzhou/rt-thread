@@ -865,8 +865,11 @@ int rt_page_install(rt_region_t region)
     if (region.end != region.start && !(region.start & ARCH_PAGE_MASK) &&
         !(region.end & ARCH_PAGE_MASK))
     {
-        void *head = addr_to_page(page_start, (void *)region.start);
-        void *tail = addr_to_page(page_start, (void *)region.end);
+        rt_region_t shadow;
+        shadow.start = region.start & ~shadow_mask;
+        shadow.end = FLOOR(region.end, shadow_mask + 1);
+        void *head = addr_to_page(page_start, (void *)shadow.start);
+        void *tail = addr_to_page(page_start, (void *)shadow.end);
 
         page_nr += ((region.end - region.start) >> ARCH_PAGE_SHIFT);
 

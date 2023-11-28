@@ -118,7 +118,7 @@ typedef uint16_t in_port_t;
 #define MSG_OOB         0x04    /* Unimplemented: Requests out-of-band data. The significance and semantics of out-of-band data are protocol-specific */
 #define MSG_DONTWAIT    0x08    /* Nonblocking i/o for this operation only */
 #define MSG_MORE        0x10    /* Sender will send more */
-
+/* LWIPPTP_SWREQ_0036 */
 #define MSG_ERRQUEUE    0x2000  /* Fetch message from error queue */
 #define MSG_CONFIRM     0x0800  /* Confirm path validity */
 

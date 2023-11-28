@@ -512,9 +512,9 @@ void _thread_exit(rt_lwp_t lwp, rt_thread_t thread)
 {
     LWP_LOCK(lwp);
     lwp->rt_rusage.ru_stime.tv_sec += thread->system_time / RT_TICK_PER_SECOND;
-    lwp->rt_rusage.ru_stime.tv_usec += thread->system_time % RT_TICK_PER_SECOND * RT_TICK_PER_SECOND;
+    lwp->rt_rusage.ru_stime.tv_usec += thread->system_time % RT_TICK_PER_SECOND * (1000000 / RT_TICK_PER_SECOND);
     lwp->rt_rusage.ru_utime.tv_sec += thread->user_time / RT_TICK_PER_SECOND;
-    lwp->rt_rusage.ru_utime.tv_usec += thread->user_time % RT_TICK_PER_SECOND * RT_TICK_PER_SECOND;
+    lwp->rt_rusage.ru_utime.tv_usec += thread->user_time % RT_TICK_PER_SECOND * (1000000 / RT_TICK_PER_SECOND);
     rt_list_remove(&thread->sibling);
     LWP_UNLOCK(lwp);
     lwp_futex_exit_robust_list(thread);

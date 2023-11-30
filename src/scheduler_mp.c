@@ -485,8 +485,17 @@ static void _mp_schedule(void)
     }
 #endif /* RT_USING_SIGNALS */
 
+    /* whether lock scheduler */
+    if (rt_atomic_load(&(current_thread->critical_lock_nest)) != 0)
+    {
+        rt_raw_spin_unlock(&pcpu->spinlock);
+        rt_raw_spin_unlock(&_spinlock);
+        rt_hw_local_irq_enable(level);
+        goto __exit;
+    }
+
     rt_raw_spin_lock(&(current_thread->spinlock));
-    if (rt_atomic_load(&(current_thread->critical_lock_nest)) == 0) /* whether lock scheduler */
+
     {
         rt_ubase_t highest_ready_priority;
 
@@ -634,9 +643,18 @@ static void _mp_scheduler_do_irq_switch(void *context)
         rt_hw_local_irq_enable(level);
         return;
     }
+
+    /* whether lock scheduler */
+    if (rt_atomic_load(&(current_thread->critical_lock_nest)) != 0)
+    {
+        rt_raw_spin_unlock(&pcpu->spinlock);
+        rt_raw_spin_unlock(&_spinlock);
+        rt_hw_local_irq_enable(level);
+        return;
+    }
+
     rt_raw_spin_lock(&(current_thread->spinlock));
-    if (rt_atomic_load(&(current_thread->critical_lock_nest)) == 0 &&
-        rt_atomic_load(&(pcpu->irq_nest)) == 0)
+    if (rt_atomic_load(&(pcpu->irq_nest)) == 0)
     {
         rt_ubase_t highest_ready_priority;
 

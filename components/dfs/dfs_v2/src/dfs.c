@@ -571,7 +571,10 @@ int dfs_dup_to(int oldfd, struct dfs_fdtable *fdtab)
     int newfd = -1;
     struct dfs_fdtable *fdt = NULL;
 
-    dfs_file_lock();
+    if (dfs_file_lock() != RT_EOK)
+    {
+        return -RT_ENOSYS;
+    }
 
     if (fdtab == NULL)
     {
@@ -617,7 +620,10 @@ int dfs_dup_from(int oldfd, struct dfs_fdtable *fdtab)
     int newfd = -1;
     struct dfs_file *file;
 
-    dfs_file_lock();
+    if (dfs_file_lock() != RT_EOK)
+    {
+        return -RT_ENOSYS;
+    }
 
     if (fdtab == NULL)
     {
@@ -955,7 +961,11 @@ int dfs_fd_dump(int argc, char** argv)
 {
     int index;
 
-    dfs_file_lock();
+    if (dfs_file_lock() != RT_EOK)
+    {
+        return -RT_ENOSYS;
+    }
+
     for (index = 0; index < _fdtab.maxfd; index++)
     {
         struct dfs_file *file = _fdtab.fds[index];

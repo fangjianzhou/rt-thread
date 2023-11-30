@@ -118,8 +118,13 @@ char *lwp_getcwd(void)
 {
     char *dir_buf = RT_NULL;
     struct rt_lwp *lwp = RT_NULL;
+    rt_thread_t thread = rt_thread_self();
 
-    lwp = (struct rt_lwp *)rt_thread_self()->lwp;
+    if (thread)
+    {
+        lwp = (struct rt_lwp *)thread->lwp;
+    }
+
     if (lwp)
     {
         if(lwp->working_directory[0] != '/')

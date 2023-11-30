@@ -291,12 +291,13 @@ rt_err_t rt_mp_delete(rt_mp_t mp)
         rt_thread_resume(thread);
     }
 
+    rt_raw_spin_unlock_irqrestore(&(mp->spinlock), level);
+
     /* release allocated room */
     rt_free(mp->start_address);
 
     /* detach object */
     rt_object_delete(&(mp->parent));
-    rt_raw_spin_unlock_irqrestore(&(mp->spinlock), level);
 
     return RT_EOK;
 }
@@ -326,14 +327,14 @@ void *rt_mp_alloc(rt_mp_t mp, rt_int32_t time)
     /* get current thread */
     thread = rt_thread_self();
 
-    level = rt_raw_spin_lock_irqsave(&(mp->spinlock));
+    level = rt_spin_lock_irqsave(&(mp->spinlock));
 
     while (mp->block_free_count == 0)
     {
         /* memory block is unavailable. */
         if (time == 0)
         {
-            rt_raw_spin_unlock_irqrestore(&(mp->spinlock), level);
+            rt_spin_unlock_irqrestore(&(mp->spinlock), level);
 
             rt_set_errno(-RT_ETIMEOUT);
 
@@ -361,7 +362,7 @@ void *rt_mp_alloc(rt_mp_t mp, rt_int32_t time)
         }
 
         /* enable interrupt */
-        rt_raw_spin_unlock_irqrestore(&(mp->spinlock), level);
+        rt_spin_unlock_irqrestore(&(mp->spinlock), level);
 
         /* do a schedule */
         rt_schedule();
@@ -375,7 +376,7 @@ void *rt_mp_alloc(rt_mp_t mp, rt_int32_t time)
             if (time < 0)
                 time = 0;
         }
-        level = rt_raw_spin_lock_irqsave(&(mp->spinlock));
+        level = rt_spin_lock_irqsave(&(mp->spinlock));
     }
 
     /* memory block is available. decrease the free block counter */
@@ -391,7 +392,7 @@ void *rt_mp_alloc(rt_mp_t mp, rt_int32_t time)
     /* point to memory pool */
     *(rt_uint8_t **)block_ptr = (rt_uint8_t *)mp;
 
-    rt_raw_spin_unlock_irqrestore(&(mp->spinlock), level);
+    rt_spin_unlock_irqrestore(&(mp->spinlock), level);
 
     RT_OBJECT_HOOK_CALL(rt_mp_alloc_hook,
                         (mp, (rt_uint8_t *)(block_ptr + sizeof(rt_uint8_t *))));

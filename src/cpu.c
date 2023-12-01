@@ -398,7 +398,7 @@ rt_base_t rt_cpus_lock(void)
     struct rt_cpu* pcpu;
 
     level = rt_hw_local_irq_disable();
-
+    rt_enter_critical();
     pcpu = rt_cpu_self();
     if (pcpu->current_thread != RT_NULL)
     {
@@ -443,6 +443,7 @@ void rt_cpus_unlock(rt_base_t level)
         }
     }
     rt_hw_local_irq_enable(level);
+    rt_exit_critical();
 }
 RTM_EXPORT(rt_cpus_unlock);
 

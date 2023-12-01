@@ -19,9 +19,6 @@ if GetDepend('SAL_USING_LWIP'):
 if GetDepend('SAL_USING_AT'):
     src += ['impl/af_inet_at.c']
 
-if GetDepend('RT_USING_DFS_V2') and GetDepend('SAL_USING_AF_UNIX'):
-    src += ['impl/af_inet_unix.c']
-
 if GetDepend('SAL_USING_TLS'):
     src += ['impl/proto_mbedtls.c']
 

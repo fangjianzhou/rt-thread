@@ -130,7 +130,13 @@ route_ip4_add(ip4_addr_t *ip_addr, ip4_addr_t *netmask, struct netif *inp)
         route_list->prev = rt_node;
     }
     route_list = rt_node;
-    
+
+#if defined(SAL_USING_AF_NETLINK)
+#if LWIP_IPV4
+    rtnl_route_notify(ip_addr->addr, netmask->addr, inp->ip_addr.addr, RTM_NEWROUTE);
+#endif
+#endif
+
     return ERR_OK;
 }
 
@@ -167,7 +173,11 @@ route_ip4_delete(ip4_addr_t *ip_addr, ip4_addr_t *netmask)
             return ERR_OK;
         }
     }
-    
+
+#if defined(SAL_USING_AF_NETLINK)
+    rtnl_route_notify(ip_addr->addr, netmask->addr, 0, RTM_DELROUTE);
+#endif
+
     return ERR_OK;
 }
 
@@ -251,6 +261,33 @@ int inet_route_foreach(void (*func)(const char *name, uint32_t ip_addr, uint32_t
     }
     return 0;
 }
+
+#if defined(SAL_USING_AF_NETLINK)
+int
+route_for_each_notify(struct msg_buf *msg, int (*cb)(struct msg_buf *m_buf, uint32_t addr, uint32_t netmask, uint32_t sre_addr, int rt_num, int index))
+{
+    struct route_node *rt_node;
+    int rt_num = 0;
+    int index = 0;
+
+    rt_node=route_list;
+    while(rt_node != NULL)
+    {
+        rt_num ++;
+        rt_node=rt_node->next;
+    }
+
+    for(rt_node=route_list; rt_node!=NULL; rt_node=rt_node->next) {
+        // if (cb(msg, rt_node->ip_addr.addr, rt_node->netmask.addr, rt_node->netif->ip_addr, rt_num, index) < 0)
+        if (cb(msg, rt_node->ip_addr.addr, rt_node->netmask.addr, 0, rt_num, index) < 0)
+            return ERR_MEM;
+
+        index ++;
+    }
+
+    return ERR_OK;
+}
+#endif
 
 #endif
 

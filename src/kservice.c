@@ -1786,7 +1786,10 @@ void *_memheap_alloc(struct rt_memheap *heap, rt_size_t size);
 void _memheap_free(void *rmem);
 void *_memheap_realloc(struct rt_memheap *heap, void *rmem, rt_size_t newsize);
 #define _MEM_INIT(_name, _start, _size) \
-    rt_memheap_init(&system_heap, _name, _start, _size)
+    do {\
+        rt_memheap_init(&system_heap, _name, _start, _size); \
+        system_heap.locked = RT_TRUE; \
+    } while(0)
 #define _MEM_MALLOC(_size)  \
     _memheap_alloc(&system_heap, _size)
 #define _MEM_REALLOC(_ptr, _newsize)    \

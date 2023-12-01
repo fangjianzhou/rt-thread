@@ -143,13 +143,9 @@ rt_err_t rt_memheap_init(struct rt_memheap *memheap,
     /* not in free list */
     item->next_free = item->prev_free = RT_NULL;
 
-#if defined(RT_USING_HEAP_ISR)
-    memheap->locked = RT_TRUE;
-#else
     /* initialize semaphore lock */
     rt_sem_init(&(memheap->lock), name, 1, RT_IPC_FLAG_PRIO);
     memheap->locked = RT_FALSE;
-#endif
 
     LOG_D("memory heap: start addr 0x%08x, size %d, free list header 0x%08x",
           start_addr, size, &(memheap->free_header));

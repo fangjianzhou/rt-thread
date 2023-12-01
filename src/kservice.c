@@ -1718,13 +1718,13 @@ rt_inline void _heap_lock_init(void)
 }
 
 #if defined(RT_USING_HEAP_ISR)
-static RT_DEFINE_SPINLOCK(_spinlock);
+static RT_DEFINE_SPINLOCK(_heap_spinlock);
 #endif
 
 rt_inline rt_base_t _heap_lock(void)
 {
 #if defined(RT_USING_HEAP_ISR)
-    return rt_spin_lock_irqsave(&_spinlock);
+    return rt_spin_lock_irqsave(&_heap_spinlock);
 #elif defined(RT_USING_MUTEX)
     if (rt_thread_self())
         return rt_mutex_take(&_lock, RT_WAITING_FOREVER);
@@ -1739,7 +1739,7 @@ rt_inline rt_base_t _heap_lock(void)
 rt_inline void _heap_unlock(rt_base_t level)
 {
 #if defined(RT_USING_HEAP_ISR)
-    rt_spin_unlock_irqrestore(&_spinlock, level);
+    rt_spin_unlock_irqrestore(&_heap_spinlock, level);
 #elif defined(RT_USING_MUTEX)
     RT_ASSERT(level == RT_EOK);
     if (rt_thread_self())

@@ -49,7 +49,7 @@
 #include "lwip/ip6_addr.h"
 #if defined(SAL_USING_AF_NETLINK)
 #include <route_netlink.h>
-#include <msg.h>
+#include <sal_msg.h>
 #endif
 
 #ifdef __cplusplus

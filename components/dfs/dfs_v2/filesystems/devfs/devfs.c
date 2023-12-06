@@ -13,13 +13,13 @@
 
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/unistd.h>
 
 #include <dfs.h>
 #include <dfs_fs.h>
 #include <dfs_file.h>
 #include <dfs_dentry.h>
 #include <dfs_mnt.h>
-
 
 static int dfs_devfs_open(struct dfs_file *file)
 {
@@ -36,7 +36,6 @@ static int dfs_devfs_open(struct dfs_file *file)
             return -ENOENT;
         }
         file->fpos = 0;
-        return 0;
     }
 
     if (!S_ISDIR(file->vnode->mode))
@@ -56,9 +55,9 @@ static int dfs_devfs_open(struct dfs_file *file)
                     ret = RT_EOK;
                 }
             }
-            else if (device->ops)
+            else if (device->ops && file->vnode->ref_count == 1)
 #else
-            if (device->ops)
+            if (device->ops && file->vnode->ref_count == 1)
 #endif /* RT_USING_POSIX_DEVIO */
             {
                 ret = rt_device_open(device, RT_DEVICE_OFLAG_RDWR);
@@ -81,11 +80,6 @@ static int dfs_devfs_close(struct dfs_file *file)
     RT_ASSERT(file != RT_NULL);
     RT_ASSERT(file->vnode->ref_count > 0);
 
-    if (file->vnode->ref_count != 1)
-    {
-        return ret;
-    }
-
     if (file->vnode && file->vnode->data)
     {
         /* get device handler */
@@ -96,9 +90,9 @@ static int dfs_devfs_close(struct dfs_file *file)
         {
             ret = device->fops->close(file);
         }
-        else if (device->ops)
+        else if (device->ops && file->vnode->ref_count == 1)
 #else
-        if (device->ops)
+        if (device->ops && file->vnode->ref_count == 1)
 #endif /* RT_USING_POSIX_DEVIO */
         {
             /* close device handler */
@@ -431,7 +425,6 @@ static void dfs_devfs_mkdir(const char *fullpath, mode_t mode)
     if (path)
     {
         int index = len - 1;
-        struct proc_dentry *entry = RT_NULL;
 
         rt_strcpy(path, fullpath);
 
@@ -503,7 +496,7 @@ int dfs_devfs_update(void)
     int count = rt_object_get_length(RT_Object_Class_Device);
     if (count > 0)
     {
-        rt_device_t *devices = (struct device_dirent *)rt_malloc(count * sizeof(rt_device_t));
+        rt_device_t *devices = rt_malloc(count * sizeof(rt_device_t));
         if (devices)
         {
             rt_object_get_pointers(RT_Object_Class_Device, (rt_object_t *)devices, count);

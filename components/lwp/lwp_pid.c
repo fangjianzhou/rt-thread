@@ -14,25 +14,33 @@
  *                             error
  * 2023-10-27     shell        Format codes of sys_exit(). Fix the data racing where lock is missed
  *                             Add reference on pid/tid, so the resource is not freed while using.
+ *                             Add support for waitpid(options=WNOHANG)
  * 2023-11-16     xqyjlj       Fix the case where pid is 0
  * 2023-11-17     xqyjlj       add process group and session support
+ * 2023-11-24     shell        Support of waitpid(options=WNOTRACED|WCONTINUED);
+ *                             Reimplement the waitpid with a wait queue method, and fixup problem
+ *                             with waitpid(pid=-1)/waitpid(pid=-pgid)/waitpid(pid=0) that only one
+ *                             process can be traced while waiter suspend
  */
 
-#include <rthw.h>
-#include <rtthread.h>
+/* for waitpid, we are compatible to Linux extension */
+#define _GNU_SOURCE
 
 #define DBG_TAG "lwp.pid"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
+#include "lwp_internal.h"
+#include "tty.h"
+
+#include <rthw.h>
+#include <rtthread.h>
 #include <dfs_file.h>
 #include <unistd.h>
 #include <stdio.h> /* rename() */
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/statfs.h> /* statfs() */
-
-#include "lwp_internal.h"
-#include "tty.h"
 
 #ifdef ARCH_MM_MMU
 #include "lwp_user_mm.h"
@@ -377,22 +385,22 @@ rt_lwp_t lwp_create(rt_base_t flags)
     if (new_lwp)
     {
         /* minimal setup of lwp object */
-        new_lwp->session = -1;
+        new_lwp->D_session = -1;
         new_lwp->ref = 1;
 #ifdef RT_USING_SMP
         new_lwp->bind_cpu = RT_CPUS_NR;
 #endif
-        new_lwp->pgid = 0;
-        new_lwp->sid = 0;
-        new_lwp->did_exec = RT_FALSE;
-        rt_list_init(&new_lwp->wait_list);
         rt_list_init(&new_lwp->t_grp);
         rt_list_init(&new_lwp->pgrp_node);
         rt_list_init(&new_lwp->timer);
         lwp_user_object_lock_init(new_lwp);
         rt_wqueue_init(&new_lwp->wait_queue);
+        rt_wqueue_init(&new_lwp->waitpid_waiters);
         lwp_signal_init(&new_lwp->signal);
         rt_mutex_init(&new_lwp->lwp_lock, "lwp_lock", RT_IPC_FLAG_PRIO);
+
+        if (flags & LWP_CREATE_FLAG_NOTRACE_EXEC)
+            new_lwp->did_exec = RT_TRUE;
 
         /* lwp with pid */
         if (flags & LWP_CREATE_FLAG_ALLOC_PID)
@@ -452,10 +460,11 @@ void lwp_free(struct rt_lwp* lwp)
      */
     LOG_D("lwp free: %p", lwp);
 
-    LWP_LOCK(lwp);
-
     group = lwp_pgrp_find(lwp_pgid_get_byprocess(lwp));
-    lwp_pgrp_remove(group, lwp);
+    if (group)
+        lwp_pgrp_remove(group, lwp);
+
+    LWP_LOCK(lwp);
 
     if (lwp->args != RT_NULL)
     {
@@ -554,7 +563,7 @@ rt_inline void _clear_child_tid(rt_thread_t thread)
     }
 }
 
-void lwp_exit(rt_lwp_t lwp, rt_base_t status)
+void lwp_exit(rt_lwp_t lwp, lwp_status_t status)
 {
     rt_thread_t thread;
 
@@ -576,7 +585,7 @@ void lwp_exit(rt_lwp_t lwp, rt_base_t status)
      * Brief: only one thread should calls exit_group(),
      * but we can not ensured that during run-time
      */
-    lwp->lwp_ret = LWP_CREATE_STAT(status);
+    lwp->lwp_status = status;
     LWP_UNLOCK(lwp);
 
     lwp_terminate(lwp);
@@ -603,7 +612,7 @@ void lwp_exit(rt_lwp_t lwp, rt_base_t status)
     _thread_exit(lwp, thread);
 }
 
-void lwp_thread_exit(rt_thread_t thread, rt_base_t status)
+void lwp_thread_exit(rt_thread_t thread, int status)
 {
     rt_thread_t header_thr;
     struct rt_lwp *lwp;
@@ -621,7 +630,11 @@ void lwp_thread_exit(rt_thread_t thread, rt_base_t status)
     header_thr = rt_list_entry(lwp->t_grp.prev, struct rt_thread, sibling);
     if (header_thr == thread && thread->sibling.prev == &lwp->t_grp)
     {
-        lwp->lwp_ret = LWP_CREATE_STAT(status);
+        /**
+         * if thread exit, treated as process exit normally.
+         * This is reasonable since trap event is exited through lwp_exit()
+         */
+        lwp->lwp_status = LWP_CREATE_STAT_EXIT(status);
         LWP_UNLOCK(lwp);
 
         lwp_terminate(lwp);
@@ -642,7 +655,7 @@ static void _pop_tty(rt_lwp_t lwp)
         struct termios *old_stdin_termios = get_old_termios();
         struct rt_lwp *old_lwp = NULL;
 
-        if (lwp->session == -1)
+        if (lwp->D_session == -1)
         {
             tcsetattr(1, 0, old_stdin_termios);
         }
@@ -790,190 +803,369 @@ pid_t lwp_name2pid(const char *name)
 
 int lwp_getpid(void)
 {
-    return ((struct rt_lwp *)rt_thread_self()->lwp)->pid;
+    rt_lwp_t lwp = lwp_self();
+    return lwp ? lwp->pid : 1;
+    // return ((struct rt_lwp *)rt_thread_self()->lwp)->pid;
 }
 
-/**
- * @brief Wait for a child lwp to terminate. Do the essential recycling. Setup
- *        status code for user
- */
-static sysret_t _lwp_wait_and_recycle(struct rt_lwp *child, rt_thread_t cur_thr,
-                                      struct rt_lwp *self_lwp, int *status,
-                                      int options, struct rusage *ru)
+rt_inline void _update_ru(struct rt_lwp *child, struct rt_lwp *self_lwp, struct rusage *uru)
 {
-    sysret_t error;
-    int lwp_stat;
-    int terminated;
     struct rusage rt_rusage;
-
-    if (!child)
+    if (uru != RT_NULL)
     {
-        error = -RT_ERROR;
+        rt_rusage.ru_stime.tv_sec = child->rt_rusage.ru_stime.tv_sec;
+        rt_rusage.ru_stime.tv_usec = child->rt_rusage.ru_stime.tv_usec;
+        rt_rusage.ru_utime.tv_sec = child->rt_rusage.ru_utime.tv_sec;
+        rt_rusage.ru_utime.tv_usec = child->rt_rusage.ru_utime.tv_usec;
+        lwp_data_put(self_lwp, uru, &rt_rusage, sizeof(*uru));
+    }
+}
+
+/* do statistical summary and reap the child if neccessary */
+static rt_err_t _stats_and_reap_child(rt_lwp_t child, rt_thread_t cur_thr,
+                                      struct rt_lwp *self_lwp, int *ustatus,
+                                      int options, struct rusage *uru)
+{
+    int lwp_stat = child->lwp_status;
+
+    /* report statistical data to process */
+    _update_ru(child, self_lwp, uru);
+
+    if (child->terminated && !(options & WNOWAIT))
+    {
+        /** Reap the child process if it's exited */
+        LOG_D("func %s: child detached", __func__);
+        lwp_pid_put(child);
+        lwp_children_unregister(self_lwp, child);
+    }
+
+    if (ustatus)
+        lwp_data_put(self_lwp, ustatus, &lwp_stat, sizeof(*ustatus));
+
+    return RT_EOK;
+}
+
+#define HAS_CHILD_BUT_NO_EVT (-1024)
+
+/* check if the process is already terminate */
+static sysret_t _query_event_from_lwp(rt_lwp_t child, rt_thread_t cur_thr, rt_lwp_t self_lwp,
+                                      int options, int *status)
+{
+    sysret_t rc;
+
+    LWP_LOCK(child);
+    if (child->terminated)
+    {
+        rc = child->pid;
+    }
+    else if ((options & WSTOPPED) && child->jobctl_stopped && !child->wait_reap_stp)
+    {
+        child->wait_reap_stp = 1;
+        rc = child->pid;
     }
     else
     {
-        /**
-         * Note: Critical Section
-         * - child lwp (RW. This will modify its parent if valid)
-         */
-        LWP_LOCK(child);
-        if (child->terminated)
+        rc = HAS_CHILD_BUT_NO_EVT;
+    }
+    LWP_UNLOCK(child);
+
+    LOG_D("%s(child_pid=%d ('%s'), stopped=%d) => %d", __func__, child->pid, child->cmd, child->jobctl_stopped, rc);
+    return rc;
+}
+
+/* verify if the process is child, and reap it */
+static pid_t _verify_child_and_reap(rt_thread_t cur_thr, rt_lwp_t self_lwp,
+                                       pid_t wait_pid, int options, int *ustatus,
+                                       struct rusage *uru)
+{
+    sysret_t rc;
+    struct rt_lwp *child;
+
+    /* check if pid is reference to a valid child */
+    lwp_pid_lock_take();
+    child = lwp_from_pid_locked(wait_pid);
+    if (!child)
+        rc = -EINVAL;
+    else if (child->parent != self_lwp)
+        rc = -ESRCH;
+    else
+        rc = wait_pid;
+
+    lwp_pid_lock_release();
+
+    if (rc > 0)
+    {
+        rc = _query_event_from_lwp(child, cur_thr, self_lwp, options, ustatus);
+        if (rc > 0)
         {
-            error = child->pid;
-        }
-        else if (rt_list_isempty(&child->wait_list))
-        {
-            /**
-             * Note: only one thread can wait on wait_list.
-             * dont reschedule before mutex unlock
-             */
-            rt_enter_critical();
-
-            error = rt_thread_suspend_with_flag(cur_thr, RT_INTERRUPTIBLE);
-            if (error == 0)
-            {
-                rt_list_insert_before(&child->wait_list, &(cur_thr->tlist));
-                LWP_UNLOCK(child);
-
-                rt_set_errno(RT_EINTR);
-                rt_exit_critical();
-                rt_schedule();
-
-                /**
-                 * Since parent is holding a reference to children this lock will
-                 * not be freed before parent dereference to it.
-                 */
-                LWP_LOCK(child);
-
-                error = rt_get_errno();
-                if (error == RT_EINTR)
-                {
-                    error = -EINTR;
-                }
-                else if (error != RT_EOK)
-                {
-                    LOG_W("%s: unexpected error code %ld", __func__, error);
-                }
-                else
-                {
-                    error = child->pid;
-                }
-            }
-            else
-                rt_exit_critical();
-        }
-        else
-            error = -RT_EINTR;
-
-        lwp_stat = child->lwp_ret;
-        terminated = child->terminated;
-        LWP_UNLOCK(child);
-
-        if (ru != RT_NULL)
-        {
-            rt_rusage.ru_stime.tv_sec = child->rt_rusage.ru_stime.tv_sec;
-            rt_rusage.ru_stime.tv_usec = child->rt_rusage.ru_stime.tv_usec;
-            rt_rusage.ru_utime.tv_sec = child->rt_rusage.ru_utime.tv_sec;
-            rt_rusage.ru_utime.tv_usec = child->rt_rusage.ru_utime.tv_usec;
-            lwp_data_put(self_lwp, ru, &rt_rusage, sizeof(*ru));
-        }
-        if (error > 0)
-        {
-            if (terminated)
-            {
-                LOG_D("func %s: child detached", __func__);
-                /** Reap the child process if it's exited */
-                lwp_pid_put(child);
-                lwp_children_unregister(self_lwp, child);
-            }
-
-            if (status)
-                lwp_data_put(self_lwp, status, &lwp_stat, sizeof(*status));
+            _stats_and_reap_child(child, cur_thr, self_lwp, ustatus, options, uru);
         }
     }
+    return rc;
+}
 
-    return error;
+/* try to reap any child */
+static pid_t _reap_any_child_pid(rt_thread_t cur_thr, rt_lwp_t self_lwp, pid_t pair_pgid,
+                                 int options, int *ustatus, struct rusage *uru)
+{
+    sysret_t rc = -ECHILD;
+    struct rt_lwp *child;
+
+    LWP_LOCK(self_lwp);
+    child = self_lwp->first_child;
+
+    /* find a exited child if any */
+    while (child)
+    {
+        if (pair_pgid && child->pgid != pair_pgid)
+            continue;
+
+        rc = _query_event_from_lwp(child, cur_thr, self_lwp, options, ustatus);
+        if (rc > 0)
+            break;
+
+        child = child->sibling;
+    }
+    LWP_UNLOCK(self_lwp);
+
+    if (rc > 0)
+    {
+        _stats_and_reap_child(child, cur_thr, self_lwp, ustatus, options, uru);
+    }
+    return rc;
+}
+
+rt_err_t lwp_waitpid_kick(rt_lwp_t parent, rt_lwp_t self_lwp)
+{
+    /* waker provide the message mainly through its lwp_status */
+    rt_wqueue_wakeup(&parent->waitpid_waiters, self_lwp);
+    return RT_EOK;
+}
+
+struct waitpid_handle {
+    struct rt_wqueue_node wq_node;
+    int options;
+    rt_lwp_t waker_lwp;
+};
+
+/* the IPC message is setup and notify the parent */
+static int _waitq_filter(struct rt_wqueue_node *wait_node, void *key)
+{
+    int can_accept_evt = 0;
+    rt_thread_t waiter = wait_node->polling_thread;
+    pid_t destiny = (pid_t)wait_node->key;
+    rt_lwp_t waker_lwp = key;
+    struct waitpid_handle *handle;
+    rt_ubase_t options;
+
+    handle = rt_container_of(wait_node, struct waitpid_handle, wq_node);
+
+    RT_ASSERT(waiter != RT_NULL);
+    options = handle->options;
+
+    /* filter out if waker is not the one */
+    if (destiny > 0)
+    {
+        /**
+         * in waitpid immediately return routine, we already do the check
+         * that pid is one of the child process of waiting thread
+         */
+        can_accept_evt = waker_lwp->pid == destiny;
+    }
+    else if (destiny == -1)
+    {
+        can_accept_evt = waker_lwp->parent == waiter->lwp;
+    }
+    else
+    {
+        /* destiny == 0 || destiny == -pgid */
+        pid_t waiter_pgid;
+        if (destiny == 0)
+        {
+            waiter_pgid = lwp_pgid_get_byprocess(waiter->lwp);
+        }
+        else
+        {
+            waiter_pgid = -destiny;
+        }
+        can_accept_evt = waiter_pgid == lwp_pgid_get_byprocess(waker_lwp);
+    }
+
+    /* filter out if event is not desired */
+    if (can_accept_evt)
+    {
+        if ((options & WEXITED) && waker_lwp->terminated)
+            can_accept_evt = 1;
+        else if ((options & WSTOPPED) && WIFSTOPPED(waker_lwp->lwp_status))
+            can_accept_evt = 1;
+        else if ((options & WCONTINUED) && WIFCONTINUED(waker_lwp->lwp_status))
+            can_accept_evt = 1;
+        else
+            can_accept_evt = 0;
+    }
+
+    /* setup message for waiter if accepted */
+    if (can_accept_evt)
+        handle->waker_lwp = waker_lwp;
+
+    /* 0 if event is accepted, otherwise discard */
+    return !can_accept_evt;
+}
+
+/* the waiter cleanup IPC message and wait for desired event here */
+static rt_err_t _wait_for_event(rt_thread_t cur_thr, rt_lwp_t self_lwp,
+                                struct waitpid_handle *handle, pid_t destiny)
+{
+    rt_err_t ret;
+
+    /* current context checking */
+    RT_DEBUG_SCHEDULER_AVAILABLE(RT_TRUE);
+
+    handle->wq_node.polling_thread = cur_thr;
+    handle->wq_node.key = destiny;
+    handle->wq_node.wakeup = _waitq_filter;
+    handle->wq_node.wqueue = &self_lwp->waitpid_waiters;
+    rt_list_init(&handle->wq_node.list);
+
+    cur_thr->error = RT_EOK;
+
+    LOG_D("%s(self_lwp=%d) wait for event", __func__, self_lwp->pid);
+
+    rt_enter_critical();
+    ret = rt_thread_suspend_with_flag(cur_thr, RT_INTERRUPTIBLE);
+    if (ret == RT_EOK)
+    {
+        rt_wqueue_add(handle->wq_node.wqueue, &handle->wq_node);
+        rt_exit_critical();
+
+        rt_schedule();
+
+        ret = cur_thr->error;
+
+        /**
+         * cur_thr error is a positive value, but some legacy implementation
+         * use a negative one. So we check to avoid errors
+         */
+        ret = ret > 0 ? -ret : ret;
+
+        /**
+         * we dont rely on this actually, but we cleanup it since wakeup API
+         * set this up durint operation, and this will cause some messy condition
+         */
+        handle->wq_node.wqueue->flag = RT_WQ_FLAG_CLEAN;
+        rt_wqueue_remove(&handle->wq_node);
+    }
+    else
+    {
+        /* failed to suspend, return immediately with failure */
+        rt_exit_critical();
+    }
+
+    return ret;
+}
+
+/* wait for IPC event and do the cleanup if neccessary */
+static sysret_t _wait_and_reap(rt_thread_t cur_thr, rt_lwp_t self_lwp, const pid_t pid,
+                               int options, int *ustatus, struct rusage *uru)
+{
+    sysret_t rc;
+    struct waitpid_handle handle;
+    rt_lwp_t waker;
+
+    /* wait for SIGCHLD or other async events */
+    handle.options = options;
+    handle.waker_lwp = 0;
+    rc = _wait_for_event(cur_thr, self_lwp, &handle, pid);
+
+    waker = handle.waker_lwp;
+    if (waker != RT_NULL)
+    {
+        rc = waker->pid;
+
+        /* check out if any process exited */
+        LOG_D("%s: woken up by lwp=%d", __func__, waker->pid);
+        _stats_and_reap_child(waker, cur_thr, self_lwp, ustatus, options, uru);
+    }
+    /**
+     * else if (rc != RT_EOK)
+     * unable to do a suspend, or wakeup unexpectedly
+     * -> then returned a failure
+     */
+
+    return rc;
 }
 
 pid_t lwp_waitpid(const pid_t pid, int *status, int options, struct rusage *ru)
 {
     pid_t rc = -1;
-    struct rt_thread *thread;
-    struct rt_lwp *child;
+    struct rt_thread *cur_thr;
     struct rt_lwp *self_lwp;
-    rt_processgroup_t group;
 
-    thread = rt_thread_self();
+    cur_thr = rt_thread_self();
     self_lwp = lwp_self();
 
-    if (!self_lwp)
+    if (!cur_thr || !self_lwp)
     {
-        rc = -RT_EINVAL;
+        rc = -EINVAL;
     }
     else
     {
+        /* check if able to reap desired child immediately */
         if (pid > 0)
         {
-            lwp_pid_lock_take();
-            child = lwp_from_pid_raw_locked(pid);
-            if (child->parent != self_lwp)
-                rc = -RT_ERROR;
-            else
-                rc = RT_EOK;
-            lwp_pid_lock_release();
-
-            if (rc == RT_EOK)
-                rc = _lwp_wait_and_recycle(child, thread, self_lwp, status, options, ru);
+            /* if pid is child then try to reap it */
+            rc = _verify_child_and_reap(cur_thr, self_lwp, pid, options, status, ru);
         }
         else if (pid == -1)
         {
-            LWP_LOCK(self_lwp);
-            child = self_lwp->first_child;
-            LWP_UNLOCK(self_lwp);
-            RT_ASSERT(!child || child->parent == self_lwp);
-
-            rc = _lwp_wait_and_recycle(child, thread, self_lwp, status, options, ru);
+            /* any terminated child */
+            rc = _reap_any_child_pid(cur_thr, self_lwp, 0, options, status, ru);
         }
-        else if (pid < -1 || pid == 0)
+        else
         {
-            rt_list_t *node = RT_NULL;
-            pid_t pgid = 0;
+            /**
+             * (pid < -1 || pid == 0)
+             * any terminated child with matched pgid
+             */
 
+            pid_t pair_pgid;
             if (pid == 0)
             {
-                pgid = lwp_pgid_get_byprocess(self_lwp);
+                pair_pgid = lwp_pgid_get_byprocess(self_lwp);
             }
             else
             {
-                pgid = -pid;
+                pair_pgid = -pid;
             }
+            rc = _reap_any_child_pid(cur_thr, self_lwp, pair_pgid, options, status, ru);
+        }
 
-            group = lwp_pgrp_find(pgid);
-            if (group != RT_NULL)
+        if (rc == HAS_CHILD_BUT_NO_EVT)
+        {
+            if (!(options & WNOHANG))
             {
-                rt_mutex_take_interruptible(&group->mutex, RT_WAITING_FOREVER);
-                node = &(group->process);
-                child = (rt_lwp_t)rt_list_entry(node, struct rt_lwp, pgrp_node);
-                rt_mutex_release(&group->mutex);
-                rc = _lwp_wait_and_recycle(child, thread, self_lwp, status, options, ru);
+                /* otherwise, arrange a suspend and wait for async event */
+                options |= WEXITED;
+                rc = _wait_and_reap(cur_thr, self_lwp, pid, options, status, ru);
             }
             else
             {
-                rc = -ECHILD;
+                /**
+                 * POSIX.1: If waitpid() was invoked with WNOHANG set in options,
+                 * it has at least one child process specified by pid for which
+                 * status is not available, and status is not available for any
+                 * process specified by pid, 0 is returned
+                 */
+                rc = 0;
             }
+        }
+        else
+        {
+            RT_ASSERT(rc != 0);
         }
     }
 
-    if (rc > 0)
-    {
-        LOG_D("%s: recycle child id %ld (status=0x%x)", __func__, (long)rc, status ? *status : 0);
-    }
-    else
-    {
-        RT_ASSERT(rc != 0);
-        LOG_D("%s: wait failed with code %ld", __func__, (long)rc);
-    }
-
+    LOG_D("waitpid() => %d, *status=0x%x", rc, status ? *status:0);
     return rc;
 }
 
@@ -1386,6 +1578,41 @@ static void _wait_sibling_exit(rt_lwp_t lwp, rt_thread_t curr_thread)
     }
 }
 
+static void _notify_parent(rt_lwp_t lwp)
+{
+    int si_code;
+    int signo_or_exitcode;
+    lwp_siginfo_ext_t ext;
+    lwp_status_t lwp_status = lwp->lwp_status;
+
+    if (WIFSIGNALED(lwp_status))
+    {
+        si_code = (lwp_status & LWP_COREDUMP_FLAG) ? CLD_DUMPED : CLD_KILLED;
+        signo_or_exitcode = WTERMSIG(lwp_status);
+    }
+    else
+    {
+        si_code = CLD_EXITED;
+        signo_or_exitcode = WEXITSTATUS(lwp->lwp_status);
+    }
+
+    lwp_waitpid_kick(lwp->parent, lwp);
+
+    if (!lwp_sigismember(&lwp->signal.sig_action_nocldstop, SIGCHLD))
+    {
+        ext = rt_malloc(sizeof(struct lwp_siginfo));
+
+        if (ext)
+        {
+            rt_thread_t cur_thr = rt_thread_self();
+            ext->sigchld.status = signo_or_exitcode;
+            ext->sigchld.stime = cur_thr->system_time;
+            ext->sigchld.utime = cur_thr->user_time;
+        }
+        lwp_signal_kill(lwp->parent, SIGCHLD, si_code, ext);
+    }
+}
+
 static void _resr_cleanup(struct rt_lwp *lwp)
 {
     LWP_LOCK(lwp);
@@ -1439,21 +1666,14 @@ static void _resr_cleanup(struct rt_lwp *lwp)
     LWP_LOCK(lwp);
     if (lwp->parent)
     {
-        struct rt_thread *thread;
-
+        /* if successfully race to setup lwp->terminated before parent detach */
         LWP_UNLOCK(lwp);
-        if (!rt_list_isempty(&lwp->wait_list))
-        {
-            thread = rt_list_entry(lwp->wait_list.next, struct rt_thread, tlist);
-            thread->error = RT_EOK;
-            thread->msg_ret = (void*)(rt_size_t)lwp->lwp_ret;
-            rt_thread_resume(thread);
-        }
-        else
-        {
-            /* children cannot detach itself and must wait for parent to take care of it */
-            lwp_signal_kill(lwp->parent, SIGCHLD, CLD_EXITED, 0);
-        }
+
+        /**
+         * Note: children cannot detach itself and must wait for parent to take
+         * care of it
+         */
+        _notify_parent(lwp);
     }
     else
     {

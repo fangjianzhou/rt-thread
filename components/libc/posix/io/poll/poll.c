@@ -7,6 +7,7 @@
  * Date           Author       Notes
  * 2016-12-28     Bernard      first version
  * 2018-03-09     Bernard      Add protection for pt->triggered.
+ * 2023-12-04     Shell        Fix return code and error verification
  */
 
 #include <stdint.h>
@@ -99,6 +100,11 @@ static int poll_wait_timeout(struct rt_poll_table *pt, int msec)
                         RT_TIMER_CTRL_SET_TIME,
                         &timeout);
                 rt_timer_start(&(thread->thread_timer));
+                rt_set_errno(RT_ETIMEOUT);
+            }
+            else
+            {
+                rt_set_errno(0);
             }
 
             rt_spin_unlock_irqrestore(&_spinlock, level);
@@ -109,7 +115,14 @@ static int poll_wait_timeout(struct rt_poll_table *pt, int msec)
         }
     }
 
-    ret = !pt->triggered;
+    ret = rt_get_errno();
+    if (ret == RT_EINTR)
+        ret = -RT_EINTR;
+    else if (pt->triggered)
+        ret = RT_EOK;
+    else
+        ret = -RT_ETIMEOUT;
+
     rt_spin_unlock_irqrestore(&_spinlock, level);
 
     return ret;
@@ -194,8 +207,13 @@ static int poll_do(struct pollfd *fds, nfds_t nfds, struct rt_poll_table *pt, in
         if (num || istimeout)
             break;
 
-        if (poll_wait_timeout(pt, msec))
+        ret = poll_wait_timeout(pt, msec);
+        if (ret == -RT_EINTR)
+            return -EINTR;
+        else if (ret == -RT_ETIMEOUT)
             istimeout = 1;
+        else
+            istimeout = 0;
     }
 
     return num;

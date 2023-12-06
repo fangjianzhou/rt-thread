@@ -544,20 +544,24 @@ int nanosleep(const struct timespec *rqtp, struct timespec *rmtp)
     unsigned long ns = rqtp->tv_sec * NANOSECOND_PER_SECOND + rqtp->tv_nsec;
     rt_ktime_boottime_get_ns(&old_ts);
     rt_ktime_hrtimer_ndelay(ns);
-    if (rt_get_errno() == -RT_EINTR)
+    if (rt_get_errno() == RT_EINTR)
     {
         if (rmtp)
         {
+            rt_base_t rsec, rnsec;
             rt_ktime_boottime_get_ns(&new_ts);
 
-            rmtp->tv_sec = 0;
-            rmtp->tv_nsec =
-                (old_ts.tv_nsec + ns) - ((new_ts.tv_sec - old_ts.tv_sec) * NANOSECOND_PER_SECOND + new_ts.tv_nsec);
-
-            if (rmtp->tv_nsec > NANOSECOND_PER_SECOND)
+            rsec = old_ts.tv_sec + rqtp->tv_sec - new_ts.tv_sec;
+            rnsec = old_ts.tv_nsec + rqtp->tv_nsec - new_ts.tv_nsec;
+            if (rnsec < 0)
             {
-                rmtp->tv_nsec %= NANOSECOND_PER_SECOND;
-                rmtp->tv_sec += rmtp->tv_nsec / NANOSECOND_PER_SECOND;
+                rmtp->tv_sec = rsec - 1;
+                rmtp->tv_nsec = NANOSECOND_PER_SECOND + rnsec;
+            }
+            else
+            {
+                rmtp->tv_sec = rsec;
+                rmtp->tv_nsec = rnsec;
             }
         }
         rt_set_errno(EINTR);

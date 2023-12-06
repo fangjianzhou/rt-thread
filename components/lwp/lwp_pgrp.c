@@ -140,27 +140,31 @@ int lwp_pgrp_delete(rt_processgroup_t group)
         {
             ctty = session->ctty;
             if (ctty)
+            {
+                /**
+                 * Note: it's safe to release pgrp even we do this multiple,
+                 * the neccessary check is done before the tty actually detach
+                 */
                 tty_lock(ctty);
+                tty_rel_pgrp(ctty, group); // tty_unlock
+            }
+
             SESS_LOCK(session);
             PGRP_LOCK(group);
             if (group->session == session && session->ctty == ctty)
             {
                 rt_object_detach(&(group->object));
                 is_session_free = lwp_session_remove(session, group);
-
-                if (ctty)
-                    tty_rel_pgrp(ctty, group);
             }
             else
             {
                 retry = 1;
+
             }
 
             PGRP_UNLOCK(group);
             if (is_session_free != 1)
                 SESS_UNLOCK(session);
-            if (ctty)
-                tty_unlock(ctty);
         }
         else
         {

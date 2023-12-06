@@ -6,7 +6,8 @@ src     = []
 CPPPATH = [cwd]
 
 if GetDepend(['UTEST_LWP_TC', 'RT_USING_SMART']):
-    src += ['pid_get.c']
+    src += [#'pid_get.c',
+            'condvar_timedwait_tc.c', 'condvar_broadcast_tc.c', 'condvar_signal_tc.c']
 
 group = DefineGroup('utestcases', src, depend = ['RT_USING_UTESTCASES'], CPPPATH = CPPPATH)
 

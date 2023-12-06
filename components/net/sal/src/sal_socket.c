@@ -483,7 +483,7 @@ static int socket_init(int family, int type, int protocol, struct sal_socket **r
         netdev = netdev_get_by_family(family);
         if (netdev == RT_NULL)
         {
-            LOG_E("not find network interface device by protocol family(%d).", family);
+            LOG_D("not find network interface device by protocol family(%d).", family);
             return -3;
         }
 
@@ -1059,7 +1059,7 @@ int sal_socket(int domain, int type, int protocol)
     retval = socket_init(domain, type, protocol, &sock);
     if (retval < 0)
     {
-        LOG_E("SAL socket protocol family input failed, return error %d.", retval);
+        LOG_D("SAL socket protocol family input failed, return error %d.", retval);
         socket_delete(socket);
         return -1;
     }

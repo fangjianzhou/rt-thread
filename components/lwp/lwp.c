@@ -13,6 +13,7 @@
  * 2023-02-20     wangxiaoyao  fix bug on foreground app switch
  * 2023-10-16     Shell        Support a new backtrace framework
  * 2023-11-17     xqyjlj       add process group and session support
+ * 2023-11-30     Shell        add lwp_startup()
  */
 
 #define DBG_TAG "lwp"
@@ -69,7 +70,7 @@ struct termios *get_old_termios(void)
     return &old_stdin_termios;
 }
 
-int lwp_component_init(void)
+static int lwp_component_init(void)
 {
     int rc;
     if ((rc = lwp_tid_init()) != RT_EOK)
@@ -91,6 +92,87 @@ int lwp_component_init(void)
     return rc;
 }
 INIT_COMPONENT_EXPORT(lwp_component_init);
+
+rt_weak int lwp_startup_debug_request(void)
+{
+    return 0;
+}
+
+#define LATENCY_TIMES (3)
+#define LATENCY_IN_MSEC (128)
+#define LWP_CONSOLE_PATH "CONSOLE=/dev/console"
+const char *init_search_path[] = {
+    "/sbin/init",
+    "/bin/init",
+};
+
+/**
+ * Startup process 0 and do the essential works
+ * This is the "Hello World" point of RT-Smart
+ */
+static int lwp_startup(void)
+{
+    int error;
+
+    const char *init_path;
+    char *argv[] = {0, "&"};
+    char *envp[] = {LWP_CONSOLE_PATH, 0};
+
+#ifdef LWP_DEBUG
+    int command;
+    int countdown = LATENCY_TIMES;
+    while (countdown)
+    {
+        command = lwp_startup_debug_request();
+        if (command)
+        {
+            return 0;
+        }
+        rt_kprintf("Press any key to stop init process startup ... %d\n", countdown);
+        countdown -= 1;
+        rt_thread_mdelay(LATENCY_IN_MSEC);
+    }
+    rt_kprintf("Starting init ...\n");
+#endif
+
+    for (size_t i = 0; i < sizeof(init_search_path)/sizeof(init_search_path[0]); i++)
+    {
+        struct stat s;
+        init_path = init_search_path[i];
+        error = stat(init_path, &s);
+        if (error == 0)
+        {
+            argv[0] = (void *)init_path;
+            error = lwp_execve((void *)init_path, 0, sizeof(argv)/sizeof(argv[0]), argv, envp);
+            if (error < 0)
+            {
+                LOG_E("%s: failed to startup process 0 (init)\n"
+                    "Switching to legacy mode...", __func__);
+            }
+            else if (error != 1)
+            {
+                LOG_E("%s: pid 1 is already allocated", __func__);
+                error = -EBUSY;
+            }
+            else
+            {
+                rt_lwp_t p = lwp_from_pid_locked(1);
+                p->sig_protected = 0;
+
+                error = 0;
+            }
+            break;
+        }
+    }
+
+    if (error)
+    {
+        LOG_E("%s: init program not found\n"
+            "Switching to legacy mode...", __func__);
+    }
+    return error;
+}
+INIT_APP_EXPORT(lwp_startup);
 
 void lwp_setcwd(char *buf)
 {
@@ -1223,7 +1305,7 @@ pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
         return -EACCES;
     }
 
-    lwp = lwp_create(LWP_CREATE_FLAG_ALLOC_PID);
+    lwp = lwp_create(LWP_CREATE_FLAG_ALLOC_PID | LWP_CREATE_FLAG_NOTRACE_EXEC);
 
     if (lwp == RT_NULL)
     {
@@ -1300,39 +1382,49 @@ pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
             LOG_D("lwp kernel => (0x%08x, 0x%08x)\n", (rt_size_t)thread->stack_addr,
                     (rt_size_t)thread->stack_addr + thread->stack_size);
             self_lwp = lwp_self();
+
+            /* when create init, self_lwp == null */
+            if (self_lwp == RT_NULL && lwp_to_pid(lwp) != 1)
+            {
+                self_lwp = lwp_from_pid_and_lock(1);
+            }
+
             if (self_lwp)
             {
                 //lwp->tgroup_leader = &thread; //add thread group leader for lwp
-                lwp->__pgrp = tid;
-                lwp->session = self_lwp->session; // TODO: should be delete
+                lwp->D__pgrp = tid;
+                lwp->D_session = self_lwp->D_session; // TODO: should be delete
                 /* lwp add to children link */
-                // lwp_children_register(self_lwp, lwp);
+                lwp_children_register(self_lwp, lwp);
             }
             else
             {
                 //lwp->tgroup_leader = &thread; //add thread group leader for lwp
-                lwp->__pgrp = tid; // TODO: should be delete
+                lwp->D__pgrp = tid; // TODO: should be delete
             }
 
             rt_session_t session = RT_NULL;
             rt_processgroup_t group = RT_NULL;
 
             group = lwp_pgrp_create(lwp);
-            lwp_pgrp_insert(group, lwp);
-            if (self_lwp == RT_NULL)
+            if (group)
             {
-                session = lwp_session_find(lwp_sid_get_byprocess(self_lwp));
-                lwp_session_insert(session, group);
-            }
-            else
-            {
-                session = lwp_session_create(group);
-                lwp_session_insert(session, group);
+                lwp_pgrp_insert(group, lwp);
+                if (self_lwp == RT_NULL)
+                {
+                    session = lwp_session_create(group);
+                    lwp_session_insert(session, group);
+                }
+                else
+                {
+                    session = lwp_session_find(lwp_sid_get_byprocess(self_lwp));
+                    lwp_session_insert(session, group);
+                }
             }
 
             if (!bg)
             {
-                if (lwp->session == -1)
+                if (lwp->D_session == -1)
                 {
                     struct tty_struct *tty = RT_NULL;
                     struct rt_lwp *old_lwp;
@@ -1354,8 +1446,8 @@ pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
                     }
 
                     lwp->tty = tty;
-                    lwp->tty->pgrp = lwp->__pgrp;
-                    lwp->tty->session = lwp->session;
+                    lwp->tty->pgrp = lwp->D__pgrp;
+                    lwp->tty->session = lwp->D_session;
                     lwp->tty->foreground = lwp;
                     tcgetattr(1, &stdin_termios);
                     old_stdin_termios = stdin_termios;
@@ -1378,8 +1470,8 @@ pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
                         }
 
                         lwp->tty = self_lwp->tty;
-                        lwp->tty->pgrp = lwp->__pgrp;
-                        lwp->tty->session = lwp->session;
+                        lwp->tty->pgrp = lwp->D__pgrp;
+                        lwp->tty->session = lwp->D_session;
                         lwp->tty->foreground = lwp;
                     }
                     else
@@ -1511,7 +1603,7 @@ rt_err_t lwp_backtrace_frame(rt_thread_t uthread, struct rt_hw_backtrace_frame *
     char **argv;
     rt_lwp_t lwp;
 
-    if (uthread->lwp)
+    if (uthread->lwp && rt_scheduler_is_available())
     {
         lwp = uthread->lwp;
         argv = lwp_get_command_line_args(lwp);

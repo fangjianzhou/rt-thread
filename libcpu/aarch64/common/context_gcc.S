@@ -580,4 +580,4 @@ START_POINT(vector_serror)
     STP     X0, X1, [SP, #-0x10]!
     BL      rt_hw_trap_serror
     b .
-START_POINT_END(vector_exception)
+START_POINT_END(vector_serror)

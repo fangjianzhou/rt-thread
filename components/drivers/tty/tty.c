@@ -156,7 +156,7 @@ int __tty_check_change(struct tty_struct *tty, int sig)
         return 0;
     }
 
-    pgrp = lwp->__pgrp;
+    pgrp = lwp->D__pgrp;
     tty_pgrp = tty->pgrp;
 
     if (tty_pgrp && (pgrp != tty->pgrp))
@@ -204,14 +204,14 @@ static int tty_open(struct dfs_file *fd)
     }
 
     if (!noctty &&
-        current->leader &&
+        current->D_leader &&
         !current->tty &&
         tty->session == -1)
     {
         current->tty = tty;
-        current->tty_old_pgrp = 0;
-        tty->session = current->session;
-        tty->pgrp = current->__pgrp;
+        current->D_tty_old_pgrp = 0;
+        tty->session = current->D_session;
+        tty->pgrp = current->D__pgrp;
         tty->foreground = current;
     }
 
@@ -239,8 +239,8 @@ static int tty_close(struct dfs_file *fd)
 
 static int tiocsctty(struct tty_struct *tty, int arg)
 {
-    if (current->leader &&
-        (current->session == tty->session))
+    if (current->D_leader &&
+        (current->D_session == tty->session))
     {
         return 0;
     }
@@ -249,7 +249,7 @@ static int tiocsctty(struct tty_struct *tty, int arg)
      * The process must be a session leader and
      * not have a controlling tty already.
      */
-    if (!current->leader || current->tty)
+    if (!current->D_leader || current->tty)
     {
         return -EPERM;
     }
@@ -260,9 +260,9 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 
     }
     current->tty = tty;
-    current->tty_old_pgrp = 0;
-    tty->session = current->session;
-    tty->pgrp = current->__pgrp;
+    current->D_tty_old_pgrp = 0;
+    tty->session = current->D_session;
+    tty->pgrp = current->D__pgrp;
     tty->foreground = current;
     if (tty->type == TTY_DRIVER_TYPE_PTY)
     {

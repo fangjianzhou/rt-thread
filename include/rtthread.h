@@ -808,6 +808,11 @@ while (0)
 #define RT_DEBUG_SCHEDULER_AVAILABLE(need_check)
 #endif /* RT_DEBUGING_CONTEXT */
 
+rt_inline rt_bool_t rt_scheduler_is_available(void)
+{
+    return !rt_hw_interrupt_is_disabled() && rt_critical_level() == 0;
+}
+
 /**@}*/
 
 #ifdef __cplusplus

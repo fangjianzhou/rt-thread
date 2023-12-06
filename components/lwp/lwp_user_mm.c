@@ -23,10 +23,7 @@
 
 #ifdef ARCH_MM_MMU
 
-#include <lwp.h>
-#include <lwp_arch.h>
-#include <lwp_mm.h>
-#include <lwp_user_mm.h>
+#include "lwp_internal.h"
 
 #include <mm_aspace.h>
 #include <mm_fault.h>
@@ -627,11 +624,6 @@ size_t lwp_put_to_user(void *dst, void *src, size_t size)
     return lwp_data_put(lwp, dst, src, size);
 }
 
-rt_inline rt_bool_t _in_user_space(const char *addr)
-{
-    return (addr >= (char *)USER_VADDR_START && addr < (char *)USER_VADDR_TOP);
-}
-
 rt_inline rt_bool_t _can_unaligned_access(const char *addr)
 {
     return rt_kmem_v2p((char *)addr) - PV_OFFSET == addr;
@@ -642,9 +634,9 @@ void *lwp_memcpy(void * __restrict dst, const void * __restrict src, size_t size
     void *rc = dst;
     long len;
 
-    if (_in_user_space(dst))
+    if (lwp_in_user_space(dst))
     {
-        if (!_in_user_space(src))
+        if (!lwp_in_user_space(src))
         {
             len = lwp_put_to_user(dst, (void *)src, size);
             if (!len)
@@ -660,7 +652,7 @@ void *lwp_memcpy(void * __restrict dst, const void * __restrict src, size_t size
     }
     else
     {
-        if (_in_user_space(src))
+        if (lwp_in_user_space(src))
         {
             len = lwp_get_from_user(dst, (void *)src, size);
             if (!len)
@@ -987,7 +979,7 @@ size_t lwp_user_strlen(const char *s)
 
 size_t lwp_strlen(struct rt_lwp *lwp, const char *s)
 {
-    if (_in_user_space(s))
+    if (lwp_in_user_space(s))
         return lwp_user_strlen_ext(lwp, s);
     else
         return strlen(s);

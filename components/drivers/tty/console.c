@@ -118,12 +118,15 @@ struct tty_struct *console_tty_get(void)
 static void iodev_close(struct tty_struct *console)
 {
     struct rt_device_notify rx_notify;
+    struct rt_serial_device *serial;
+    serial = (struct rt_serial_device *)console->io_dev;
 
     rx_notify.notify = RT_NULL;
     rx_notify.dev = RT_NULL;
 
     /* clear notify */
-    rt_device_control(console->io_dev, RT_DEVICE_CTRL_NOTIFY_SET, &rx_notify);
+    if (serial->rx_notify.notify == console_rx_notify)
+        rt_device_control(console->io_dev, RT_DEVICE_CTRL_NOTIFY_SET, &rx_notify);
     rt_device_close(console->io_dev);
 }
 
@@ -132,6 +135,8 @@ static rt_err_t iodev_open(struct tty_struct *console)
     rt_err_t ret = RT_EOK;
     struct rt_device_notify rx_notify;
     rt_uint16_t oflags = 0;
+    struct rt_serial_device *serial;
+    serial = (struct rt_serial_device *)console->io_dev;
 
     rt_device_control(console->io_dev, RT_DEVICE_CTRL_CONSOLE_OFLAG, &oflags);
 
@@ -141,9 +146,12 @@ static rt_err_t iodev_open(struct tty_struct *console)
         return -RT_ERROR;
     }
 
-    rx_notify.notify = console_rx_notify;
-    rx_notify.dev = (struct rt_device *)console;
-    rt_device_control(console->io_dev, RT_DEVICE_CTRL_NOTIFY_SET, &rx_notify);
+    if (serial->rx_notify.notify == 0)
+    {
+        rx_notify.notify = console_rx_notify;
+        rx_notify.dev = (struct rt_device *)console;
+        rt_device_control(console->io_dev, RT_DEVICE_CTRL_NOTIFY_SET, &rx_notify);
+    }
     return RT_EOK;
 }
 

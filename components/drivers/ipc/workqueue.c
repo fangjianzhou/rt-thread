@@ -62,9 +62,10 @@ static void _workqueue_thread_entry(void *parameter)
         level = rt_spin_lock_irqsave(&(queue->spinlock));
         if (rt_list_isempty(&(queue->work_list)))
         {
+            rt_spin_unlock_irqrestore(&(queue->spinlock), level);
+
             /* no software timer exist, suspend self. */
             rt_thread_suspend_with_flag(rt_thread_self(), RT_UNINTERRUPTIBLE);
-            rt_spin_unlock_irqrestore(&(queue->spinlock), level);
             rt_schedule();
             continue;
         }

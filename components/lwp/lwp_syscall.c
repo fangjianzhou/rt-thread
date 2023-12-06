@@ -15,6 +15,7 @@
  * 2023-07-27     Shell        Move tid_put() from lwp_free() to sys_exit()
  * 2023-11-16     xqyjlj       fix some syscalls (about sched_*, get/setpriority)
  * 2023-11-17     xqyjlj       add process group and session support
+ * 2023-11-30     Shell        Fix sys_setitimer() and exit(status)
  */
 
 #define _GNU_SOURCE
@@ -344,10 +345,14 @@ static void _crt_thread_entry(void *parameter)
 sysret_t sys_exit_group(int value)
 {
     sysret_t rc = 0;
+    lwp_status_t lwp_status;
     struct rt_lwp *lwp = lwp_self();
 
     if (lwp)
-        lwp_exit(lwp, value);
+    {
+        lwp_status = LWP_CREATE_STAT_EXIT(value);
+        lwp_exit(lwp, lwp_status);
+    }
     else
     {
         LOG_E("Can't find matching process of current thread");
@@ -365,7 +370,10 @@ sysret_t sys_exit(int status)
 
     tid = rt_thread_self();
     if (tid && tid->lwp)
+    {
         lwp_thread_exit(tid, status);
+    }
+    else
     {
         LOG_E("Can't find matching process of current thread");
         rc = -EINVAL;
@@ -937,10 +945,15 @@ sysret_t sys_kill(int pid, int signo)
             lwp_pid_lock_release();
             kret = -RT_ENOENT;
         }
+
+        if (lwp)
+        {
+            kret = lwp_signal_kill(lwp, signo, SI_USER, 0);
+            lwp_ref_dec(lwp);
+        }
     }
     else if (pid < -1 || pid == 0)
     {
-        rt_list_t *node = RT_NULL;
         pid_t pgid = 0;
         rt_processgroup_t group;
 
@@ -967,11 +980,9 @@ sysret_t sys_kill(int pid, int signo)
         group = lwp_pgrp_find(pgid);
         if (group != RT_NULL)
         {
-            rt_mutex_take_interruptible(&group->mutex, RT_WAITING_FOREVER);
-            node = &(group->process);
-            lwp = (rt_lwp_t)rt_list_entry(node, struct rt_lwp, pgrp_node);
-            lwp_ref_inc(lwp);
-            rt_mutex_release(&group->mutex);
+            PGRP_LOCK(group);
+            kret = lwp_pgrp_signal_kill(group, signo, SI_USER, 0);
+            PGRP_UNLOCK(group);
         }
         else
         {
@@ -986,13 +997,6 @@ sysret_t sys_kill(int pid, int signo)
          * that signal.
          */
         kret = -RT_ENOSYS;
-    }
-
-    if (lwp)
-    {
-        kret = lwp_signal_kill(lwp, signo, SI_USER, 0);
-        lwp_ref_dec(lwp);
-        kret = 0;
     }
 
     switch (kret)
@@ -1033,7 +1037,7 @@ sysret_t sys_getppid(void)
     if (process->parent == RT_NULL)
     {
         LOG_E("This process %d has no parent process", lwp_to_pid(process));
-        return 0;
+        return -1;
     }
     else
     {
@@ -1969,12 +1973,16 @@ static void lwp_struct_copy(struct rt_lwp *dst, struct rt_lwp *src)
     dst->data_entry = src->data_entry;
     dst->data_size = src->data_size;
     dst->args = src->args;
-    dst->leader = 0;
-    dst->session = src->session;
+    dst->D_leader = 0;
+    dst->D_session = src->D_session;
     dst->background = src->background;
-    dst->tty_old_pgrp = 0;
-    dst->__pgrp = src->__pgrp;
+    dst->D_tty_old_pgrp = 0;
+    dst->D__pgrp = src->D__pgrp;
     dst->tty = src->tty;
+
+    /* terminal API */
+    dst->term_ctrlterm = src->term_ctrlterm;
+
     rt_memcpy(dst->cmd, src->cmd, RT_NAME_MAX);
 
     rt_memcpy(&dst->signal.sig_action, &src->signal.sig_action, sizeof(dst->signal.sig_action));
@@ -1983,6 +1991,7 @@ static void lwp_struct_copy(struct rt_lwp *dst, struct rt_lwp *src)
     rt_memcpy(&dst->signal.sig_action_onstack, &src->signal.sig_action_onstack, sizeof(dst->signal.sig_action_onstack));
     rt_memcpy(&dst->signal.sig_action_restart, &dst->signal.sig_action_restart, sizeof(dst->signal.sig_action_restart));
     rt_memcpy(&dst->signal.sig_action_siginfo, &dst->signal.sig_action_siginfo, sizeof(dst->signal.sig_action_siginfo));
+    rt_memcpy(&dst->signal.sig_action_nocldstop, &dst->signal.sig_action_nocldstop, sizeof(dst->signal.sig_action_nocldstop));
     rt_strcpy(dst->working_directory, src->working_directory);
 }
 
@@ -5003,7 +5012,7 @@ sysret_t sys_pipe(int fd[2])
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
-pid_t sys_wait4(pid_t pid, int *status, int options, struct rusage *ru)
+sysret_t sys_wait4(pid_t pid, int *status, int options, struct rusage *ru)
 {
     return lwp_waitpid(pid, status, options, ru);
 }
@@ -6488,11 +6497,22 @@ sysret_t sys_chmod(const char *fileName, mode_t mode)
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
-sysret_t sys_reboot(int magic)
+#include <sys/reboot.h>
+sysret_t sys_reboot(int magic, int magic2, int type)
 {
-    rt_hw_cpu_reset();
+    sysret_t rc;
+    switch (type)
+    {
+        /* TODO add software poweroff protocols */
+        case RB_AUTOBOOT:
+        case RB_POWER_OFF:
+            rt_hw_cpu_reset();
+            break;
+        default:
+            rc = -ENOSYS;
+    }
 
-    return 0;
+    return rc;
 }
 
 ssize_t sys_pread64(int fd, void *buf, int size, size_t offset)
@@ -6721,20 +6741,25 @@ sysret_t sys_memfd_create()
 {
     return 0;
 }
+
 sysret_t sys_setitimer(int which, const struct itimerspec *restrict new, struct itimerspec *restrict old)
 {
-    int ret = 0;
-    timer_t timerid = 0;
-    struct sigevent sevp_k = {0};
+    sysret_t rc = 0;
+    rt_lwp_t lwp = lwp_self();
+    struct itimerspec new_value_k;
+    struct itimerspec old_value_k;
 
-    sevp_k.sigev_notify = SIGEV_SIGNAL;
-    sevp_k.sigev_signo = SIGALRM;
-    ret = timer_create(CLOCK_REALTIME_ALARM, &sevp_k, &timerid);
-    if (ret != 0)
+    if (!lwp_get_from_user(&new_value_k, (void *)new, sizeof(*new)) ||
+        (old && !lwp_get_from_user(&old_value_k, (void *)old, sizeof(*old))))
     {
-        return GET_ERRNO();
+        return -EFAULT;
     }
-    return sys_timer_settime(timerid,0,new,old);
+
+    rc = lwp_signal_setitimer(lwp, which, &new_value_k, &old_value_k);
+    if (lwp_put_to_user(old, (void *)&old_value_k, sizeof old_value_k) != sizeof old_value_k)
+        return -EFAULT;
+
+    return rc;
 }
 
 sysret_t sys_socketpair(int domain, int type, int protocol, int fd[2])

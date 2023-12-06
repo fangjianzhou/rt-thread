@@ -1318,6 +1318,14 @@ rt_err_t rt_hw_serial_register(struct rt_serial_device *serial,
     return ret;
 }
 
+#if defined(RT_USING_SMART) && defined(LWP_DEBUG)
+static volatile int _early_input = 0;
+int lwp_startup_debug_request(void)
+{
+    return _early_input;
+}
+#endif
+
 /* ISR for serial interrupt */
 void rt_hw_serial_isr(struct rt_serial_device *serial, int event)
 {
@@ -1380,6 +1388,9 @@ void rt_hw_serial_isr(struct rt_serial_device *serial, int event)
             {
                 serial->rx_notify.notify(serial->rx_notify.dev);
             }
+        #if defined(RT_USING_SMART) && defined(LWP_DEBUG)
+            _early_input = 1;
+        #endif
             break;
         }
         case RT_SERIAL_EVENT_TX_DONE:

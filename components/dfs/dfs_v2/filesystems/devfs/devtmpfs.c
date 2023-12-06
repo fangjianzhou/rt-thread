@@ -8,6 +8,7 @@
  * 2022-10-24     flybreak     the first version
  * 2023-02-01     xqyjlj       fix cannot open the same file repeatedly in 'w' mode
  * 2023-09-20     zmq810150896 adds truncate functionality and standardized unlink adaptations
+ * 2023-12-02     Shell        Support of dynamic device
  */
 
 #include <rthw.h>
@@ -24,6 +25,7 @@
 #define TMPFS_MAGIC         0x0B0B0B0B
 #define TMPFS_TYPE_FILE     0x00
 #define TMPFS_TYPE_DIR      0x01
+#define TMPFS_TYPE_DYN_DEV  0x02    /* dynamic device */
 
 struct devtmpfs_sb;
 
@@ -407,11 +409,32 @@ static int devtmpfs_readlink(struct dfs_dentry *dentry, char *buf, int len)
     RT_ASSERT(superblock);
 
     d_file = devtmpfs_file_lookup(superblock, dentry->pathname);
-    if (d_file && d_file->link)
+    if (d_file)
     {
-        rt_strncpy(buf, (const char *)d_file->link, len);
-        buf[len - 1] = '\0';
-        ret = rt_strlen(buf);
+        if (d_file->link)
+        {
+            if (d_file->type == TMPFS_TYPE_DYN_DEV)
+            {
+                rt_device_t device = (void *)d_file->link;
+                buf[0] = '\0';
+                ret = device->readlink(device, buf, len);
+                if (ret == 0)
+                {
+                    buf[len - 1] = '\0';
+                    ret = rt_strlen(buf);
+                }
+                else
+                {
+                    ret = 0;
+                }
+            }
+            else
+            {
+                rt_strncpy(buf, (const char *)d_file->link, len);
+                buf[len - 1] = '\0';
+                ret = rt_strlen(buf);
+            }
+        }
     }
 
     return ret;
@@ -431,7 +454,7 @@ static int devtmpfs_unlink(struct dfs_dentry *dentry)
     d_file = devtmpfs_file_lookup(superblock, dentry->pathname);
     if (d_file)
     {
-        if (d_file->link)
+        if (d_file->link && d_file->type != TMPFS_TYPE_DYN_DEV)
         {
             rt_free(d_file->link);
         }
@@ -594,6 +617,12 @@ static struct dfs_vnode *devtmpfs_lookup(struct dfs_dentry *dentry)
         if (device)
         {
             vnode = devtmpfs_create_vnode(dentry, FT_REGULAR, dfs_devfs_device_to_mode(device));
+            if (device->flag & RT_DEVICE_FLAG_DYNAMIC)
+            {
+                d_file = devtmpfs_file_lookup(superblock, dentry->pathname);
+                d_file->type = TMPFS_TYPE_DYN_DEV;
+                d_file->link = (char *)device;
+            }
         }
     }
 

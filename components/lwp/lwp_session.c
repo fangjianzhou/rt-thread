@@ -78,13 +78,14 @@ rt_session_t lwp_session_create(rt_processgroup_t leader)
         session->sid = leader->pgid;
         lwp_pgrp_update_children_info(leader, session->sid, leader->pgid);
         session->foreground_pgid = session->sid;
+        session->ctty = RT_NULL;
     }
     return session;
 }
 
 int lwp_session_delete(rt_session_t session)
 {
-    int retry = 0;
+    int retry = 1;
     lwp_tty_t ctty;
 
     /* parameter check */
@@ -100,23 +101,33 @@ int lwp_session_delete(rt_session_t session)
     {
         retry = 0;
         ctty = session->ctty;
-        if (ctty)
-            tty_lock(ctty);
-        SESS_LOCK(session);
+        SESS_LOCK_NESTED(session);
 
         if (session->ctty == ctty)
         {
             if (ctty)
+            {
+                SESS_UNLOCK(session);
+
+                /**
+                 * Note: it's safe to release the session lock now. Even if someone
+                 * race to acquire the tty, it's safe under protection of tty_lock()
+                 * and the check inside
+                 */
+                tty_lock(ctty);
                 tty_rel_sess(ctty, session);
+                session->ctty = RT_NULL;
+            }
+            else
+            {
+                SESS_UNLOCK(session);
+            }
         }
         else
         {
+            SESS_UNLOCK(session);
             retry = 1;
         }
-
-        SESS_UNLOCK(session);
-        if (ctty)
-            tty_unlock(ctty);
     }
 
     rt_object_detach(&(session->object));
@@ -318,9 +329,13 @@ sysret_t sys_setsid(void)
         {
             lwp_pgrp_delete(group);
         }
+        err = lwp_sid_get_bysession(session);
+    }
+    else
+    {
+        err = -ENOMEM;
     }
 
-    err = lwp_sid_get_bysession(session);
 
 exit:
     return err;

@@ -331,8 +331,8 @@ static int _pthread_mutex_lock_timeout(void *umutex, struct timespec *timeout)
         }
         else
         {
-            rt_set_errno(EAGAIN);
-            return -EAGAIN;
+            rt_set_errno(EINTR);
+            return -EINTR;
         }
     }
     return 0;

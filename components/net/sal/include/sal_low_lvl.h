@@ -45,9 +45,6 @@ typedef uint32_t socklen_t;
 #define SAL_SOCKET_OFFSET              0
 #endif
 
-struct sockaddr;
-struct msghdr;
-struct addrinfo;
 struct sal_socket
 {
     uint32_t magic;                    /* SAL socket magic word */
@@ -84,7 +81,6 @@ struct sal_socket_ops
     int (*getpeername)(int s, struct sockaddr *name, socklen_t *namelen);
     int (*getsockname)(int s, struct sockaddr *name, socklen_t *namelen);
     int (*ioctlsocket)(int s, long cmd, void *arg);
-    int (*socketpair) (int s, int type, int protocol, int *fds);
 #ifdef SAL_USING_POSIX
     int (*poll)       (struct dfs_file *file, struct rt_pollreq *req);
 #endif

@@ -1740,6 +1740,8 @@ err_mem:
       }
     }
 
+    conn->pcb.tcp->sock = conn->sock;
+
     if (err == ERR_OK) {
       err_t out_err;
       if ((conn->current_msg->msg.w.offset == conn->current_msg->msg.w.len) || dontblock) {

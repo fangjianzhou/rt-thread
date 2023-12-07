@@ -1357,6 +1357,15 @@ tcp_output(struct tcp_pcb *pcb)
       TCPH_SET_FLAG(seg->tcphdr, TCP_ACK);
     }
 
+#ifdef LWIP_TIMESTAMPS
+    /* Maybe it's not a good idea to make this
+     * interface to the socket layer, but it work */
+    if (seg->p && !seg->p->sk) {
+      seg->p->sk = pcb->sock;
+      seg->p->hwtstamp = 0;
+      seg->p->swtstamp = 0;
+    }
+#endif
     err = tcp_output_segment(seg, pcb, netif);
     if (err != ERR_OK) {
       /* segment could not be sent, for whatever reason */

@@ -3554,20 +3554,17 @@ static int netflags_muslc_2_lwip(int flags)
 }
 
 #ifdef ARCH_MM_MMU
-static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg,
-        struct iovec **out_iov, void **out_msg_control)
+static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg, struct iovec **out_iov)
 {
     size_t iovs_size;
     struct iovec *uiov, *kiov;
     size_t iovs_buffer_size = 0;
     void *iovs_buffer;
 
-    if (!lwp_user_accessable(umsg, sizeof(*umsg)))
+    if (lwp_get_from_user(kmsg, umsg, sizeof(*kmsg)))
     {
         return -EFAULT;
     }
-
-    lwp_get_from_user(kmsg, umsg, sizeof(*kmsg));
 
     iovs_size = sizeof(*kmsg->msg_iov) * kmsg->msg_iovlen;
     if (!lwp_user_accessable(kmsg->msg_iov, iovs_size))
@@ -3611,8 +3608,7 @@ static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg,
         ++uiov;
     }
 
-    /* msg_iov and msg_control */
-    iovs_buffer = kmem_get(iovs_buffer_size + kmsg->msg_controllen);
+    iovs_buffer = kmem_get(iovs_buffer_size);
 
     if (!iovs_buffer)
     {
@@ -3630,22 +3626,14 @@ static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg,
         ++kiov;
     }
 
-    *out_msg_control = kmsg->msg_control;
-    /* msg_control is the end of the iovs_buffer */
-    kmsg->msg_control = iovs_buffer;
-
     return 0;
 }
 #endif /* ARCH_MM_MMU */
 
-sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
+sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
 {
     int flgs, ret = -1;
     struct msghdr kmsg;
-#ifdef ARCH_MM_MMU
-    void *msg_control;
-    struct iovec *uiov, *kiov;
-#endif
 
     if (!msg)
     {
@@ -3655,31 +3643,71 @@ sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
     flgs = netflags_muslc_2_lwip(flags);
 
 #ifdef ARCH_MM_MMU
-    ret = copy_msghdr_from_user(&kmsg, msg, &uiov, &msg_control);
+    ret = copy_msghdr_from_user(&kmsg, (struct msghdr *)msg, RT_NULL);
+
+    if (!ret)
+    {
+        ret = sendmsg(socket, &kmsg, flgs);
+
+        if (ret)
+        {
+            return ret;
+        }
+
+        kmem_put(kmsg.msg_iov->iov_base);
+        kmem_put(kmsg.msg_iov);
+    }
+#else
+    rt_memcpy(&kmsg, msg, sizeof(kmsg));
+
+    ret = recvmsg(socket, &kmsg, flgs);
+
+    if (!ret)
+    {
+        msg->msg_flags = kmsg.msg_flags;
+    }
+#endif /* ARCH_MM_MMU */
+
+    return (ret < 0 ? GET_ERRNO() : ret);
+}
+
+sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
+{
+    int flgs, ret = -1;
+    struct msghdr kmsg;
+    struct iovec *uiov, *kiov;
+
+    if (!msg)
+    {
+        return -EPERM;
+    }
+
+    flgs = netflags_muslc_2_lwip(flags);
+
+#ifdef ARCH_MM_MMU
+    ret = copy_msghdr_from_user(&kmsg, msg, &uiov);
 
     if (!ret)
     {
         ret = recvmsg(socket, &kmsg, flgs);
 
-        if (ret < 0)
+        if (ret)
         {
-            goto _free_res;
+            return ret;
         }
 
         kiov = kmsg.msg_iov;
 
         for (int i = 0; i < kmsg.msg_iovlen; ++i)
         {
-            lwp_put_to_user(uiov->iov_base, kiov->iov_base, kiov->iov_len);
+            lwp_put_to_user(kiov->iov_base, uiov->iov_base, uiov->iov_len);
 
             ++kiov;
             ++uiov;
         }
 
-        lwp_put_to_user(msg_control, kmsg.msg_control, kmsg.msg_controllen);
         lwp_put_to_user(&msg->msg_flags, &kmsg.msg_flags, sizeof(kmsg.msg_flags));
 
-    _free_res:
         kmem_put(kmsg.msg_iov->iov_base);
         kmem_put(kmsg.msg_iov);
     }
@@ -3791,57 +3819,6 @@ sysret_t sys_recv(int socket, void *mem, size_t len, int flags)
 
     lwp_put_to_user((void *)mem, kmem, len);
     kmem_put(kmem);
-
-    return (ret < 0 ? GET_ERRNO() : ret);
-}
-
-sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
-{
-    int flgs, ret = -1;
-    struct msghdr kmsg;
-#ifdef ARCH_MM_MMU
-    void *msg_control;
-    struct iovec *uiov, *kiov;
-#endif
-    if (!msg)
-    {
-        return -EPERM;
-    }
-
-    flgs = netflags_muslc_2_lwip(flags);
-
-#ifdef ARCH_MM_MMU
-    ret = copy_msghdr_from_user(&kmsg, (struct msghdr *)msg, &uiov, &msg_control);
-
-    if (!ret)
-    {
-        kiov = kmsg.msg_iov;
-
-        for (int i = 0; i < kmsg.msg_iovlen; ++i)
-        {
-            lwp_get_from_user(kiov->iov_base, uiov->iov_base, kiov->iov_len);
-
-            ++kiov;
-            ++uiov;
-        }
-
-        lwp_get_from_user(kmsg.msg_control, msg_control, kmsg.msg_controllen);
-
-        ret = sendmsg(socket, &kmsg, flgs);
-
-        kmem_put(kmsg.msg_iov->iov_base);
-        kmem_put(kmsg.msg_iov);
-    }
-#else
-    rt_memcpy(&kmsg, msg, sizeof(kmsg));
-
-    ret = sendmsg(socket, &kmsg, flgs);
-
-    if (!ret)
-    {
-        msg->msg_flags = kmsg.msg_flags;
-    }
-#endif /* ARCH_MM_MMU */
 
     return (ret < 0 ? GET_ERRNO() : ret);
 }
@@ -3968,30 +3945,6 @@ sysret_t sys_socket(int domain, int type, int protocol)
 
 out:
     return (fd < 0 ? GET_ERRNO() : fd);
-}
-
-sysret_t sys_socketpair(int domain, int type, int protocol, int fd[2])
-{
-#ifdef RT_USING_SAL
-    int ret = 0;
-    int k_fd[2];
-
-    if (!lwp_user_accessable((void *)fd, sizeof(int [2])))
-    {
-        return -EFAULT;
-    }
-
-    ret = socketpair(domain, type, protocol, k_fd);
-
-    if (ret == 0)
-    {
-        lwp_put_to_user(fd, k_fd, sizeof(int [2]));
-    }
-
-    return ret;
-#else
-    return -ELIBACC;
-#endif
 }
 
 sysret_t sys_closesocket(int socket)
@@ -4892,7 +4845,7 @@ struct libc_dirent {
     off_t d_off;
     unsigned short d_reclen;
     unsigned char d_type;
-    char d_name[DIRENT_NAME_MAX];
+    char d_name[256];
 };
 
 sysret_t sys_getdents(int fd, struct libc_dirent *dirp, size_t nbytes)
@@ -7063,13 +7016,6 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_ftruncate),
     SYSCALL_SIGN(sys_setitimer),
     SYSCALL_SIGN(sys_utimensat),
-#ifdef RT_USING_POSIX_SOCKET
-    SYSCALL_SIGN(sys_notimpl),
-    SYSCALL_SIGN(sys_socketpair),                        /* 205 */
-#else
-    SYSCALL_SIGN(sys_notimpl),
-    SYSCALL_SIGN(sys_notimpl),
-#endif
 };
 
 const void *lwp_get_sys_api(rt_uint32_t number)

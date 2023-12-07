@@ -257,6 +257,18 @@ if RT_USING_LWIP
         bool "Enable hardware checksum"
         default n
 
+    config RT_LWIP_USING_TIMESTAMPS
+        bool "Enable timestamps"
+        depends on ARCH_CPU_64BIT
+        depends on RT_USING_LWIP_VER_NUM >= 0x20102
+        default n
+
+    config RT_LWIP_USING_TIMESTAMPS_QSIZE
+        int "Timestamps pbuf queue size"
+        range 32 4294967295
+        depends on RT_LWIP_USING_TIMESTAMPS
+        default 32
+
     config RT_LWIP_USING_PING
         bool "Enable ping features"
         default y

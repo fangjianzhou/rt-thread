@@ -66,47 +66,47 @@ static int at_poll(struct dfs_file *file, struct rt_pollreq *req)
 
 static const struct sal_socket_ops at_socket_ops =
 {
-    at_socket,
-    at_closesocket,
-    at_bind,
+    .socket      = at_socket,
+    .closesocket = at_closesocket,
+    .bind        = at_bind,
 #ifdef AT_USING_SOCKET_SERVER
-    at_listen,
+    .listen      = at_listen,
 #else
-    NULL,
+    .listen      = NULL,
 #endif
-    at_connect,
+    .connect     = at_connect,
 #ifdef AT_USING_SOCKET_SERVER
-    at_accept,
+    .accept      = at_accept,
 #else
-    NULL,
+    .accept      = NULL,
 #endif
-    at_sendto,
-    at_recvfrom,
-    at_getsockopt,
-    at_setsockopt,
-    at_shutdown,
-    NULL,
-    NULL,
-    NULL,
+    .sendto      = at_sendto,
+    .recvfrom    = at_recvfrom,
+    .getsockopt  = at_getsockopt,
+    .setsockopt  = at_setsockopt,
+    .shutdown    = at_shutdown,
+    .getpeername = NULL,
+    .getsockname = NULL,
+    .ioctlsocket = NULL,
 #ifdef SAL_USING_POSIX
-    at_poll,
+    .poll        = at_poll,
 #endif /* SAL_USING_POSIX */
 };
 
 static const struct sal_netdb_ops at_netdb_ops =
 {
-    at_gethostbyname,
-    NULL,
-    at_getaddrinfo,
-    at_freeaddrinfo,
+    .gethostbyname   = at_gethostbyname,
+    .gethostbyname_r = NULL,
+    .getaddrinfo     = at_getaddrinfo,
+    .freeaddrinfo    = at_freeaddrinfo,
 };
 
 static const struct sal_proto_family at_inet_family =
 {
-    AF_AT,
-    AF_INET,
-    &at_socket_ops,
-    &at_netdb_ops,
+    .family     = AF_AT,
+    .sec_family = AF_INET,
+    .skt_ops    = &at_socket_ops,
+    .netdb_ops  = &at_netdb_ops,
 };
 
 

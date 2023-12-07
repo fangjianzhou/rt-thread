@@ -83,6 +83,10 @@
 #if LWIP_CHECKSUM_ON_COPY
 #include "lwip/inet_chksum.h"
 #endif
+#ifdef LWIP_TIMESTAMPS
+#include "lwip/sock.h"
+#include "lwip/priv/sockets_priv.h"
+#endif
 
 #include <string.h>
 
@@ -186,6 +190,11 @@ pbuf_init_alloced_pbuf(struct pbuf *p, void *payload, u16_t tot_len, u16_t len, 
   p->flags = flags;
   p->ref = 1;
   p->if_idx = NETIF_NO_INDEX;
+#ifdef LWIP_TIMESTAMPS
+  p->sk = NULL;
+  p->hwtstamp = 0;
+  p->swtstamp = 0;
+#endif
 }
 
 /**
@@ -894,6 +903,11 @@ pbuf_cat(struct pbuf *h, struct pbuf *t)
 void
 pbuf_chain(struct pbuf *h, struct pbuf *t)
 {
+#ifdef LWIP_TIMESTAMPS
+  if (!h->sk) {
+    h->sk = t->sk;
+  }
+#endif
   pbuf_cat(h, t);
   /* t is now referenced by h */
   pbuf_ref(t);
@@ -968,6 +982,12 @@ pbuf_copy(struct pbuf *p_to, const struct pbuf *p_from)
   /* is the target big enough to hold the source? */
   LWIP_ERROR("pbuf_copy: target not big enough to hold source", ((p_to != NULL) &&
              (p_from != NULL) && (p_to->tot_len >= p_from->tot_len)), return ERR_ARG;);
+
+#ifdef LWIP_TIMESTAMPS
+  p_to->sk = p_from->sk;
+  p_to->hwtstamp = p_from->hwtstamp;
+  p_to->swtstamp = p_from->swtstamp;
+#endif
 
   /* iterate through pbuf chain */
   do {
@@ -1512,3 +1532,59 @@ pbuf_strstr(const struct pbuf *p, const char *substr)
   }
   return pbuf_memfind(p, substr, (u16_t)substr_len, 0);
 }
+
+#ifdef LWIP_TIMESTAMPS
+/**
+ * Check if have timestamps with flags.
+ *
+ * @param p pbuf to search
+ */
+u8_t
+pbuf_tstamp_enable(struct pbuf *p, int flags)
+{
+  return p && p->sk && (p->sk->sk_tsflags & flags);
+}
+/**
+ * Set a hardware timestamps in a new pbuf.
+ *
+ * @param orig_p origin pbuf
+ * @param hwtstamp 64bit hardware timestamps
+ * @param swtstamp 64bit software timestamps
+ */
+void
+pbuf_tstamp_tx(struct pbuf *orig_p, s64_t hwtstamp, s64_t swtstamp)
+{
+  struct lwip_sock *sk;
+  struct pbuf *p;
+  u8_t tsonly;
+
+  if (!orig_p) {
+    return;
+  }
+
+  if (swtstamp < 0) {
+    swtstamp = sys_now() * 1000000;
+  }
+
+  sk = orig_p->sk;
+  tsonly = (u8_t)(sk->sk_tsflags & SOF_TIMESTAMPING_OPT_TSONLY);
+
+  if (tsonly) {
+    p = pbuf_alloc(PBUF_RAW, orig_p->tot_len, PBUF_POOL);
+  } else {
+    p = pbuf_clone(PBUF_RAW, PBUF_POOL, orig_p);
+  }
+
+  if (!p) {
+    return;
+  }
+
+  p->sk = sk;
+  p->hwtstamp = hwtstamp;
+  p->swtstamp = swtstamp;
+
+  if (sock_queue_err_pbuf(sk, p)) {
+    pbuf_free(p);
+  }
+}
+#endif /* LWIP_TIMESTAMPS */

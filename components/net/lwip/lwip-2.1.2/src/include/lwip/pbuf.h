@@ -40,6 +40,9 @@
 
 #include "lwip/opt.h"
 #include "lwip/err.h"
+#ifdef LWIP_TIMESTAMPS
+#include "lwip/net_tstamp.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -219,6 +222,13 @@ struct pbuf {
 
   /** For incoming packets, this contains the input netif's index */
   u8_t if_idx;
+
+#ifdef LWIP_TIMESTAMPS
+  s64_t hwtstamp;
+  s64_t swtstamp;
+
+  struct lwip_sock *sk;
+#endif
 };
 
 
@@ -314,6 +324,11 @@ void pbuf_put_at(struct pbuf* p, u16_t offset, u8_t data);
 u16_t pbuf_memcmp(const struct pbuf* p, u16_t offset, const void* s2, u16_t n);
 u16_t pbuf_memfind(const struct pbuf* p, const void* mem, u16_t mem_len, u16_t start_offset);
 u16_t pbuf_strstr(const struct pbuf* p, const char* substr);
+
+#ifdef LWIP_TIMESTAMPS
+u8_t pbuf_tstamp_enable(struct pbuf *p, int flags);
+void pbuf_tstamp_tx(struct pbuf *orig_p, s64_t hwtstamp, s64_t swtstamp);
+#endif
 
 #ifdef __cplusplus
 }

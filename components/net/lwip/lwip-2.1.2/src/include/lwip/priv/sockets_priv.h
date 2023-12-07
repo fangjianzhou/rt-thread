@@ -95,10 +95,54 @@ struct lwip_sock {
 #define LWIP_SOCK_FD_FREE_FREE 2
 #endif
 
+  u32_t sk_flags;
+
+#ifdef LWIP_TIMESTAMPS
+  u16_t sk_tsflags;
+  u32_t p_error_qidx;
+  u32_t p_error_last_qidx;
+  sys_mutex_t p_error_qlock;
+  struct pbuf *p_error_queue[LWIP_TIMESTAMPS_QSIZE];
+#endif /* LWIP_TIMESTAMPS */
+
 #ifdef SAL_USING_POSIX
   rt_wqueue_t wait_head;
 #endif
 };
+
+/* Sock flags */
+enum sock_flags {
+  SOCK_TIMESTAMP,
+  /* %SO_TIMESTAMP setting */
+  SOCK_RCVTSTAMP,
+  /* %SO_TIMESTAMPNS setting */
+  SOCK_RCVTSTAMPNS,
+  /* Wake select on error queue */
+  SOCK_SELECT_ERR_QUEUE,
+  /* Indicates 64 bit timestamps always */
+  SOCK_TSTAMP_NEW,
+};
+
+/** set sock flags */
+#define lwip_sock_set_flag(sk, flag)    ((sk)->sk_flags |= (1 << (flag)))
+
+/** clear sock flags */
+#define lwip_sock_clear_flag(sk, flag)  ((sk)->sk_flags &= ~(1 << (flag)))
+
+/** test sock flags */
+#define lwip_sock_test_flag(sk, flag)   (!!((sk)->sk_flags & (1 << (flag))))
+
+#ifdef LWIP_TIMESTAMPS
+/** timestamps exposed through cmsg */
+struct scm_timestamping {
+  /**
+   * ts[0] holds a software timestamp if set
+   * ts[1] holds system hardware timestamp, sync with PHC (is deprecated)
+   * ts[2] holds a hardware timestamp if set
+   * */
+  struct timespec ts[3];
+};
+#endif /* LWIP_TIMESTAMPS */
 
 #ifndef set_errno
 #define set_errno(err) do { if (err) { errno = (err); } } while(0)

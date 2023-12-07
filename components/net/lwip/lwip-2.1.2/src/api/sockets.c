@@ -57,6 +57,9 @@
 #if LWIP_CHECKSUM_ON_COPY
 #include "lwip/inet_chksum.h"
 #endif
+#ifdef LWIP_TIMESTAMPS
+#include "lwip/sock.h"
+#endif
 
 #if LWIP_COMPAT_SOCKETS == 2 && LWIP_POSIX_SOCKETS_IO_NAMES
 #include <stdarg.h>
@@ -549,6 +552,20 @@ alloc_socket(struct netconn *newconn, int accepted)
       sockets[i].sendevent  = (NETCONNTYPE_GROUP(newconn->type) == NETCONN_TCP ? (accepted != 0) : 1);
       sockets[i].errevent   = 0;
 #endif /* LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL */
+      sockets[i].sk_flags = 0;
+#ifdef LWIP_TIMESTAMPS
+      {
+        int j;
+
+        sockets[i].sk_tsflags = 0;
+        sockets[i].p_error_qidx = 0;
+        sockets[i].p_error_last_qidx = 0;
+        sys_mutex_new(&sockets[i].p_error_qlock);
+        for (j = 0; j < LWIP_ARRAYSIZE(sockets[i].p_error_queue); ++j) {
+          sockets[i].p_error_queue[j] = NULL;
+        }
+      }
+#endif /* LWIP_TIMESTAMPS */
 #ifdef SAL_USING_POSIX
       rt_wqueue_init(&sockets[i].wait_head);
 #endif
@@ -585,6 +602,17 @@ free_socket_locked(struct lwip_sock *sock, int is_tcp, struct netconn **conn,
   sock->lastdata.pbuf = NULL;
   *conn = sock->conn;
   sock->conn = NULL;
+#ifdef LWIP_TIMESTAMPS
+  {
+    int i;
+    for (i = 0; i < LWIP_ARRAYSIZE(sock->p_error_queue); ++i) {
+      if (sock->p_error_queue[i]) {
+        pbuf_free(sock->p_error_queue[i]);
+        sock->p_error_queue[i] = NULL;
+      }
+    }
+  }
+#endif
   return 1;
 }
 
@@ -690,6 +718,7 @@ lwip_accept(int s, struct sockaddr *addr, socklen_t *addrlen)
   SYS_ARCH_PROTECT(lev);
   recvevent = (s16_t)(-1 - newconn->socket);
   newconn->socket = newsock;
+  newconn->sock = nsock;
   SYS_ARCH_UNPROTECT(lev);
 
   if (newconn->callback) {
@@ -933,13 +962,144 @@ lwip_listen(int s, int backlog)
   return 0;
 }
 
+/** fill a cmsg */
+static void
+put_cmsg(struct msghdr *msg, int level, int type, int len, void *data)
+{
+  struct cmsghdr *cm;
+  int cmlen = CMSG_LEN(len);
+
+  if (!msg->msg_control || msg->msg_controllen < sizeof(struct cmsghdr)) {
+    msg->msg_flags |= MSG_CTRUNC;
+    return;
+  }
+  if (msg->msg_controllen < cmlen) {
+    msg->msg_flags |= MSG_CTRUNC;
+    cmlen = msg->msg_controllen;
+  }
+
+  cm = msg->msg_control;
+
+  cm->cmsg_level = level;
+  cm->cmsg_type = type;
+  cm->cmsg_len = cmlen;
+  MEMCPY(CMSG_DATA(cm), data, cmlen - sizeof(*cm));
+
+  cmlen = LWIP_MIN(CMSG_SPACE(len), msg->msg_controllen);
+  msg->msg_control += cmlen;
+  msg->msg_controllen -= cmlen;
+
+  return;
+}
+
+#if LWIP_TIMESTAMPS
+/** set sock timestamps flags */
+static void
+lwip_sock_set_timestamps(struct lwip_sock *sock, int val, int new, int ns) {
+  if (val) {
+    if (new) {
+      lwip_sock_set_flag(sock, SOCK_TSTAMP_NEW);
+    } else {
+      lwip_sock_clear_flag(sock, SOCK_TSTAMP_NEW);
+    }
+    if (ns) {
+      lwip_sock_set_flag(sock, SOCK_RCVTSTAMPNS);
+    } else {
+      lwip_sock_clear_flag(sock, SOCK_RCVTSTAMPNS);
+    }
+    lwip_sock_set_flag(sock, SOCK_RCVTSTAMP);
+    lwip_sock_set_flag(sock, SOCK_TIMESTAMP);
+  } else {
+    lwip_sock_clear_flag(sock, SOCK_RCVTSTAMP);
+    lwip_sock_clear_flag(sock, SOCK_RCVTSTAMPNS);
+  }
+}
+/* Check if msg has storage to save timestamping.
+ */
+static int
+cmsg_has_timestamping_storage(struct lwip_sock *sock, struct msghdr *msg)
+{
+  int total_size = 0;
+
+  if (lwip_sock_test_flag(sock, SOCK_RCVTSTAMP)) {
+    /* LWIP_TIMESTAMPS only support 64bit, so we only SO_TIMESTAMP_NEW and SO_TIMESTAMP_OLD type */
+    total_size += CMSG_SPACE(sizeof(struct timespec));
+  }
+
+  if (!(sock->sk_tsflags & SOF_TIMESTAMPING_SOFTWARE) &&
+    !(sock->sk_tsflags & SOF_TIMESTAMPING_RAW_HARDWARE)) {
+    total_size += CMSG_SPACE(sizeof(struct scm_timestamping));
+  }
+
+  if (total_size == 0) {
+    return 1;
+  } else if (msg->msg_controllen < total_size) {
+    return -1;
+  }
+
+  return 0;
+}
+/* Put pbuf's timestamping to cmsg, MUST call `cmsg_has_timestamping_storage` before.
+ */
+static void
+put_cmsg_scm_timestamping(struct lwip_sock *sock, struct msghdr *msg, struct pbuf *p)
+{
+  long hw_tv_sec, hw_tv_nsec;
+  long sw_tv_sec, sw_tv_nsec;
+  void *control = msg->msg_control;
+  int controllen = msg->msg_controllen;
+  int cmsg_type, new_tstamp = lwip_sock_test_flag(sock, SOCK_TSTAMP_NEW);
+
+  hw_tv_nsec = p->hwtstamp;
+  hw_tv_sec = hw_tv_nsec / 1000000000ULL;
+  sw_tv_nsec = p->swtstamp;
+  sw_tv_sec = sw_tv_nsec / 1000000000ULL;
+
+  if (lwip_sock_test_flag(sock, SOCK_RCVTSTAMP)) {
+    struct timespec ts;
+
+    if (!lwip_sock_test_flag(sock, SOCK_RCVTSTAMPNS)) {
+      cmsg_type = new_tstamp ? SO_TIMESTAMP_NEW : SO_TIMESTAMP_OLD;
+
+      ts.tv_sec = sw_tv_sec;
+      ts.tv_nsec = sw_tv_nsec;
+    } else {
+      cmsg_type = new_tstamp ? SO_TIMESTAMPNS_NEW : SO_TIMESTAMPNS_OLD;
+
+      ts.tv_sec = hw_tv_sec;
+      ts.tv_nsec = hw_tv_nsec;
+    }
+
+    put_cmsg(msg, SOL_SOCKET, cmsg_type, sizeof(struct timespec), &ts);
+  }
+
+  if (!(sock->sk_tsflags & SOF_TIMESTAMPING_SOFTWARE) &&
+    !(sock->sk_tsflags & SOF_TIMESTAMPING_RAW_HARDWARE)) {
+    struct scm_timestamping tss;
+
+    cmsg_type = new_tstamp ? SO_TIMESTAMPING_NEW : SO_TIMESTAMPING_OLD;
+
+    tss.ts[0].tv_sec = sw_tv_sec;
+    tss.ts[0].tv_nsec = sw_tv_nsec;
+    tss.ts[1] = (struct timespec){0};
+    tss.ts[2].tv_sec = hw_tv_sec;
+    tss.ts[2].tv_nsec = hw_tv_nsec;
+
+    put_cmsg(msg, SOL_SOCKET, cmsg_type, sizeof(struct scm_timestamping), &tss);
+  }
+
+  msg->msg_control = control;
+  msg->msg_controllen = controllen;
+}
+#endif /* LWIP_TIMESTAMPS */
+
 #if LWIP_TCP
 /* Helper function to loop over receiving pbufs from netconn
  * until "len" bytes are received or we're otherwise done.
  * Keeps sock->lastdata for peeking or partly copying.
  */
 static ssize_t
-lwip_recv_tcp(struct lwip_sock *sock, void *mem, size_t len, int flags)
+lwip_recv_tcp(struct lwip_sock *sock, struct msghdr *message, void *mem, size_t len, int flags)
 {
   u8_t apiflags = NETCONN_NOAUTORCVD;
   ssize_t recvd = 0;
@@ -1010,6 +1170,18 @@ lwip_recv_tcp(struct lwip_sock *sock, void *mem, size_t len, int flags)
     /* TCP combines multiple pbufs for one recv */
     LWIP_ASSERT("invalid copylen, len would underflow", recv_left >= copylen);
     recv_left -= copylen;
+
+#ifdef LWIP_TIMESTAMPS
+    if (message && flags == 0 && p) {
+      int status = cmsg_has_timestamping_storage(sock, message);
+
+      if (!status) {
+        put_cmsg_scm_timestamping(sock, message, p);
+      } else if (status < 0) {
+        message->msg_flags |= MSG_CTRUNC;
+      }
+    }
+#endif
 
     /* Unless we peek the incoming message... */
     if ((flags & MSG_PEEK) == 0) {
@@ -1200,6 +1372,18 @@ lwip_recvfrom_udp_raw(struct lwip_sock *sock, int flags, struct msghdr *msg, u16
       }
     }
 #endif /* LWIP_NETBUF_RECVINFO */
+#ifdef LWIP_TIMESTAMPS
+    if (flags == 0 && !msg->msg_flags) {
+      int status = cmsg_has_timestamping_storage(sock, msg);
+
+      if (!status) {
+        put_cmsg_scm_timestamping(sock, msg, buf->p);
+        wrote_msg = 1;
+      } else if (status < 0) {
+        msg->msg_flags |= MSG_CTRUNC;
+      }
+    }
+#endif /* LWIP_TIMESTAMPS */
 
     if (!wrote_msg) {
       msg->msg_controllen = 0;
@@ -1231,7 +1415,7 @@ lwip_recvfrom(int s, void *mem, size_t len, int flags,
   }
 #if LWIP_TCP
   if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) == NETCONN_TCP) {
-    ret = lwip_recv_tcp(sock, mem, len, flags);
+    ret = lwip_recv_tcp(sock, NULL, mem, len, flags);
     lwip_recv_tcp_from(sock, from, fromlen, "lwip_recvfrom", s, ret);
     done_socket(sock);
     return ret;
@@ -1303,14 +1487,19 @@ ssize_t
 lwip_recvmsg(int s, struct msghdr *message, int flags)
 {
   struct lwip_sock *sock;
-  int i;
+  int i, check_flags;
   ssize_t buflen;
+
+  check_flags = MSG_PEEK|MSG_DONTWAIT;
+#ifdef LWIP_TIMESTAMPS
+  check_flags |= MSG_ERRQUEUE;
+#endif
 
   LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_recvmsg(%d, message=%p, flags=0x%x)\n", s, (void *)message, flags));
   LWIP_ERROR("lwip_recvmsg: invalid message pointer", message != NULL, return ERR_ARG;);
-  LWIP_ERROR("lwip_recvmsg: unsupported flags", (flags & ~(MSG_PEEK|MSG_DONTWAIT)) == 0,
-             set_errno(EOPNOTSUPP); return -1;);
+  LWIP_ERROR("lwip_recvmsg: unsupported flags", (flags & ~(check_flags)) == 0, set_errno(EOPNOTSUPP); return -1;);
 
+  LWIP_UNUSED_ARG(check_flags);
   if ((message->msg_iovlen <= 0) || (message->msg_iovlen > IOV_MAX)) {
     set_errno(EMSGSIZE);
     return -1;
@@ -1320,7 +1509,35 @@ lwip_recvmsg(int s, struct msghdr *message, int flags)
   if (!sock) {
     return -1;
   }
+#if LWIP_TIMESTAMPS
+  if ((flags & MSG_ERRQUEUE))
+  {
+    struct pbuf *p = NULL;
+    int status = cmsg_has_timestamping_storage(sock, message);
 
+    message->msg_flags = 0;
+
+    if (!status) {
+      p = sock_dequeue_err_pbuf(sock);
+      if (p) {
+        message->msg_flags |= MSG_ERRQUEUE;
+        put_cmsg_scm_timestamping(sock, message, p);
+        pbuf_free(p);
+      }
+    } else if (status < 0) {
+      sys_mutex_lock(&sock->p_error_qlock);
+      /* has tx timestamps, set flags */
+      if (sock->p_error_last_qidx != sock->p_error_qidx) {
+        message->msg_flags |= MSG_CTRUNC;
+      }
+      sys_mutex_unlock(&sock->p_error_qlock);
+    }
+
+    sock_set_errno(sock, 0);
+    done_socket(sock);
+    return 1;
+  }
+#endif /* LWIP_TIMESTAMPS */
   /* check for valid vectors */
   buflen = 0;
   for (i = 0; i < message->msg_iovlen; i++) {
@@ -1342,7 +1559,8 @@ lwip_recvmsg(int s, struct msghdr *message, int flags)
     buflen = 0;
     for (i = 0; i < message->msg_iovlen; i++) {
       /* try to receive into this vector's buffer */
-      ssize_t recvd_local = lwip_recv_tcp(sock, message->msg_iov[i].iov_base, message->msg_iov[i].iov_len, recv_flags);
+      ssize_t recvd_local = lwip_recv_tcp(sock, message, message->msg_iov[i].iov_base,
+          message->msg_iov[i].iov_len, recv_flags);
       if (recvd_local > 0) {
         /* sum up received bytes */
         buflen += recvd_local;
@@ -1556,6 +1774,11 @@ lwip_sendmsg(int s, const struct msghdr *msg, int flags)
       if (chain_buf.p == NULL) {
         chain_buf.p = chain_buf.ptr = p;
         /* add pbuf to existing pbuf chain */
+#ifdef LWIP_TIMESTAMPS
+        chain_buf.p->sk = sock;
+        chain_buf.p->hwtstamp = 0;
+        chain_buf.p->swtstamp = 0;
+#endif
       } else {
         if (chain_buf.p->tot_len + p->len > 0xffff) {
           /* overflow */
@@ -1683,6 +1906,11 @@ lwip_sendto(int s, const void *data, size_t size, int flags,
   err = netbuf_ref(&buf, data, short_size);
 #endif /* LWIP_NETIF_TX_SINGLE_PBUF */
   if (err == ERR_OK) {
+#ifdef LWIP_TIMESTAMPS
+    buf.p->sk = sock;
+    buf.p->hwtstamp = 0;
+    buf.p->swtstamp = 0;
+#endif
 #if LWIP_IPV4 && LWIP_IPV6
     /* Dual-stack: Unmap IPv4 mapped IPv6 addresses */
     if (IP_IS_V6_VAL(buf.addr) && ip6_addr_isipv4mappedipv6(ip_2_ip6(&buf.addr))) {
@@ -1706,6 +1934,7 @@ lwip_sendto(int s, const void *data, size_t size, int flags,
 int
 lwip_socket(int domain, int type, int protocol)
 {
+  struct lwip_sock *sock;
   struct netconn *conn;
   int i;
 
@@ -1757,8 +1986,10 @@ lwip_socket(int domain, int type, int protocol)
     set_errno(ENFILE);
     return -1;
   }
+  sock = &sockets[i - LWIP_SOCKET_OFFSET];
   conn->socket = i;
-  done_socket(&sockets[i - LWIP_SOCKET_OFFSET]);
+  conn->sock = sock;
+  done_socket(sock);
   LWIP_DEBUGF(SOCKETS_DEBUG, ("%d\n", i));
   set_errno(0);
   return i;
@@ -3019,6 +3250,38 @@ lwip_getsockopt_impl(int s, int level, int optname, void *optval, socklen_t *opt
         }
         break;
 #endif /* LWIP_SO_LINGER */
+#ifdef LWIP_TIMESTAMPS
+        case SO_TIMESTAMP_OLD:
+          *(int *)optval = lwip_sock_test_flag(sock, SOCK_RCVTSTAMP) &&
+              lwip_sock_test_flag(sock, SOCK_TSTAMP_NEW) &&
+              lwip_sock_test_flag(sock, SOCK_RCVTSTAMPNS);
+          break;
+
+        case SO_TIMESTAMPNS_OLD:
+          *(int *)optval = lwip_sock_test_flag(sock, SOCK_RCVTSTAMPNS) &&
+              lwip_sock_test_flag(sock, SOCK_TSTAMP_NEW);
+          break;
+
+        case SO_TIMESTAMP_NEW:
+          *(int *)optval = lwip_sock_test_flag(sock, SOCK_RCVTSTAMP) &&
+              lwip_sock_test_flag(sock, SOCK_TSTAMP_NEW);
+          break;
+
+        case SO_TIMESTAMPNS_NEW:
+          *(int *)optval = lwip_sock_test_flag(sock, SOCK_RCVTSTAMPNS) &&
+              lwip_sock_test_flag(sock, SOCK_TSTAMP_NEW);
+          break;
+        case SO_TIMESTAMPING_OLD:
+          {
+            struct so_timestamping *timestamping = optval;
+
+            timestamping->flags = sock->sk_tsflags;
+          }
+          break;
+        case SO_SELECT_ERR_QUEUE:
+          *(int *)optval = lwip_sock_test_flag(sock, SOCK_SELECT_ERR_QUEUE);
+          break;
+#endif /* LWIP_TIMESTAMPS */
 #if LWIP_UDP
         case SO_NO_CHECK:
           LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, *optlen, int, NETCONN_UDP);
@@ -3423,6 +3686,35 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
         }
         break;
 #endif /* LWIP_SO_LINGER */
+#ifdef LWIP_TIMESTAMPS
+        case SO_TIMESTAMP_OLD:
+          lwip_sock_set_timestamps(sock, *(int *)optval, 0, 0);
+          break;
+        case SO_TIMESTAMP_NEW:
+          lwip_sock_set_timestamps(sock, *(int *)optval, 1, 0);
+          break;
+        case SO_TIMESTAMPNS_OLD:
+          lwip_sock_set_timestamps(sock, *(int *)optval, 0, 1);
+          break;
+        case SO_TIMESTAMPNS_NEW:
+          lwip_sock_set_timestamps(sock, *(int *)optval, 1, 1);
+          break;
+        case SO_TIMESTAMPING_NEW:
+        case SO_TIMESTAMPING_OLD:
+          {
+            struct so_timestamping *timestamping = (struct so_timestamping *)optval;
+
+            if (timestamping->flags & ~SOF_TIMESTAMPING_MASK) {
+              done_socket(sock);
+              return EINVAL;
+            }
+            sock->sk_tsflags = timestamping->flags;
+          }
+          break;
+        case SO_SELECT_ERR_QUEUE:
+          lwip_sock_set_flag(sock, SOCK_SELECT_ERR_QUEUE);
+          break;
+#endif /* LWIP_TIMESTAMPS */
 #if LWIP_UDP
         case SO_NO_CHECK:
           LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, optlen, int, NETCONN_UDP);

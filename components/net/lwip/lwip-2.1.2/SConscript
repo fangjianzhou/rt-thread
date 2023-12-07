@@ -14,6 +14,7 @@ src/core/memp.c
 src/core/netif.c
 src/core/pbuf.c
 src/core/raw.c
+src/core/sock.c
 src/core/stats.c
 src/core/sys.c
 src/core/tcp.c

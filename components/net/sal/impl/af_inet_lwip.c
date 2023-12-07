@@ -10,15 +10,15 @@
 
 #include <rtthread.h>
 
+#ifdef SAL_USING_POSIX
+#include <poll.h>
+#endif
+
 #include <lwip/sockets.h>
 #include <lwip/netdb.h>
 #include <lwip/api.h>
 #include <lwip/init.h>
 #include <lwip/netif.h>
-
-#ifdef SAL_USING_POSIX
-#include <poll.h>
-#endif
 
 #include <sal_low_lvl.h>
 #include <af_inet.h>
@@ -284,6 +284,16 @@ static int inet_poll(struct dfs_file *file, struct rt_pollreq *req)
             /* clean error event */
             sock->errevent = 0;
         }
+#ifdef RT_LWIP_USING_TIMESTAMPS
+        if (lwip_sock_test_flag(sock, SOCK_SELECT_ERR_QUEUE))
+        {
+            /* Does errevent need to be set? */
+            if (sock->p_error_last_qidx != sock->p_error_qidx)
+            {
+                mask |= POLLPRI;
+            }
+        }
+#endif
         rt_spin_unlock_irqrestore(&_spinlock, level);
     }
 
@@ -312,7 +322,6 @@ static const struct sal_socket_ops lwip_socket_ops =
     .getpeername = lwip_getpeername,
     .getsockname = inet_getsockname,
     .ioctlsocket = inet_ioctlsocket,
-    .socketpair  = RT_NULL,
 #ifdef SAL_USING_POSIX
     .poll        = inet_poll,
 #endif

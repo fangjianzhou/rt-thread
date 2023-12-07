@@ -118,9 +118,7 @@ typedef uint16_t in_port_t;
 #define MSG_OOB         0x04    /* Unimplemented: Requests out-of-band data. The significance and semantics of out-of-band data are protocol-specific */
 #define MSG_DONTWAIT    0x08    /* Nonblocking i/o for this operation only */
 #define MSG_MORE        0x10    /* Sender will send more */
-/* LWIPPTP_SWREQ_0036 */
 #define MSG_ERRQUEUE    0x2000  /* Fetch message from error queue */
-#define MSG_CONFIRM     0x0800  /* Confirm path validity */
 
 /* Options for level IPPROTO_IP */
 #define IP_TOS             1
@@ -307,7 +305,7 @@ struct sal_ifmap
     unsigned char port;
 };
 
-struct sal_ifreq
+struct sal_ifreq 
 {
     union
     {
@@ -346,7 +344,6 @@ int sal_recvfrom(int socket, void *mem, size_t len, int flags,
 int sal_sendto(int socket, const void *dataptr, size_t size, int flags,
     const struct sockaddr *to, socklen_t tolen);
 int sal_socket(int domain, int type, int protocol);
-int sal_socketpair(int domain, int type, int protocol, int *fds);
 int sal_closesocket(int socket);
 int sal_ioctlsocket(int socket, long cmd, void *arg);
 

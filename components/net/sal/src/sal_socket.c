@@ -11,12 +11,8 @@
 
 #include <rtthread.h>
 #include <rthw.h>
-
-#include <string.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
-#include <fcntl.h>
 
 #include <sal_socket.h>
 #include <sal_netdb.h>
@@ -443,11 +439,6 @@ static int socket_init(int family, int type, int protocol, struct sal_socket **r
     struct netdev *netdv_def = netdev_default;
     struct netdev *netdev = RT_NULL;
     rt_bool_t flag = RT_FALSE;
-
-    if (family == AF_UNIX)
-    {
-        netdv_def = netdev_lo;
-    }
 
     if (family < 0 || family > AF_MAX)
     {
@@ -1082,36 +1073,6 @@ int sal_socket(int domain, int type, int protocol)
         return sock->socket;
     }
     socket_delete(socket);
-    return -1;
-}
-
-int sal_socketpair(int domain, int type, int protocol, int *fds)
-{
-    int unix_fd[2];
-    struct sal_socket *socka;
-    struct sal_socket *sockb;
-    struct sal_proto_family *pf;
-
-    if (domain == AF_UNIX)
-    {
-        /* get the socket object by socket descriptor */
-        SAL_SOCKET_OBJ_GET(socka, fds[0]);
-        SAL_SOCKET_OBJ_GET(sockb, fds[1]);
-
-        /* valid the network interface socket opreation */
-        SAL_NETDEV_SOCKETOPS_VALID(socka->netdev, pf, socket);
-
-        unix_fd[0] = (int)(size_t)socka->user_data;
-        unix_fd[1] = (int)(size_t)sockb->user_data;
-
-        if (pf->skt_ops->socketpair)
-        {
-            return pf->skt_ops->socketpair(domain, type, protocol, unix_fd);
-        }
-    }
-
-    rt_set_errno(EINVAL);
-
     return -1;
 }
 

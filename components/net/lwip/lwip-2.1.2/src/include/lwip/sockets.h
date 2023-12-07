@@ -140,9 +140,9 @@ struct msghdr {
 
 /* RFC 3542, Section 20: Ancillary Data */
 struct cmsghdr {
-  socklen_t  cmsg_len;   /* number of bytes, including header */
-  int        cmsg_level; /* originating protocol */
-  int        cmsg_type;  /* protocol-specific type */
+  size_t  cmsg_len;   /* number of bytes, including header */
+  int     cmsg_level; /* originating protocol */
+  int     cmsg_type;  /* protocol-specific type */
 };
 /* Data section follows header and possible padding, typically referred to as
       unsigned char cmsg_data[]; */
@@ -263,6 +263,7 @@ struct linger {
 #define MSG_DONTWAIT   0x08    /* Nonblocking i/o for this operation only */
 #define MSG_MORE       0x10    /* Sender will send more */
 #define MSG_NOSIGNAL   0x20    /* Uninmplemented: Requests not to send the SIGPIPE signal if an attempt to send is made on a stream-oriented socket that is no longer connected. */
+#define MSG_ERRQUEUE   0x2000  /* Fetch message from error queue */
 
 
 /*

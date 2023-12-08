@@ -35,8 +35,10 @@ rt_err_t lwp_signal_setitimer(rt_lwp_t lwp, int which, const struct itimerspec *
         case ITIMER_REAL:
             timerid = lwp->signal.real_timer;
             rc = timer_settime(timerid, flags, new, old);
+            break;
         default:
             rc = -ENOSYS;
+            LOG_W("%s() unsupported timer", __func__);
             break;
     }
 

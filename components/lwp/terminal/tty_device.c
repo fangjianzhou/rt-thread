@@ -220,14 +220,12 @@ static ssize_t tty_fops_write(struct dfs_file *file, const void *buf,
 
 static int tty_fops_flush(struct dfs_file *file)
 {
-    RT_ASSERT(0);
-    return -1;
+    return -EINVAL;
 }
 
 static off_t tty_fops_lseek(struct dfs_file *file, off_t offset, int wherece)
 {
-    RT_ASSERT(0);
-    return -1;
+    return -EINVAL;
 }
 
 static int tty_fops_truncate(struct dfs_file *file, off_t offset)

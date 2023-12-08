@@ -6760,14 +6760,13 @@ sysret_t sys_setitimer(int which, const struct itimerspec *restrict new, struct 
     struct itimerspec new_value_k;
     struct itimerspec old_value_k;
 
-    if (!lwp_get_from_user(&new_value_k, (void *)new, sizeof(*new)) ||
-        (old && !lwp_get_from_user(&old_value_k, (void *)old, sizeof(*old))))
+    if (lwp_get_from_user(&new_value_k, (void *)new, sizeof(*new)) != sizeof(*new))
     {
         return -EFAULT;
     }
 
     rc = lwp_signal_setitimer(lwp, which, &new_value_k, &old_value_k);
-    if (lwp_put_to_user(old, (void *)&old_value_k, sizeof old_value_k) != sizeof old_value_k)
+    if (old && lwp_put_to_user(old, (void *)&old_value_k, sizeof old_value_k) != sizeof old_value_k)
         return -EFAULT;
 
     return rc;

@@ -655,14 +655,6 @@ static void _catch_signal_locked(rt_lwp_t lwp, rt_thread_t thread, int signo,
     siginfo_t usiginfo;
     siginfo_t *p_usi;
 
-    /* copy the blocked signal mask from the registered signal action */
-    memcpy(&new_sig_mask, &lwp->signal.sig_action_mask[signo - 1], sizeof(new_sig_mask));
-
-    if (!_sigismember(&lwp->signal.sig_action_nodefer, signo))
-        _sigaddset(&new_sig_mask, signo);
-
-    _thread_signal_mask(thread, LWP_SIG_MASK_CMD_BLOCK, &new_sig_mask, &save_sig_mask);
-
     /* siginfo is need for signal action */
     if (_sigismember(&lwp->signal.sig_action_siginfo, signo))
     {
@@ -691,7 +683,7 @@ static void _catch_signal_locked(rt_lwp_t lwp, rt_thread_t thread, int signo,
         if (signo == SIGCONT)
         {
             arch_syscall_set_errno(exp_frame, EINTR, ERESTART);
-            arch_thread_signal_enter(signo, p_usi, exp_frame, 0, &save_sig_mask);
+            arch_thread_signal_enter(signo, p_usi, exp_frame, 0, &thread->signal.sigset_mask);
         }
         else if (!lwp_sigismember(&ign_sigset, signo) && !lwp->sig_protected)
         {
@@ -712,6 +704,14 @@ static void _catch_signal_locked(rt_lwp_t lwp, rt_thread_t thread, int signo,
     }
     else
     {
+        /* copy the blocked signal mask from the registered signal action */
+        memcpy(&new_sig_mask, &lwp->signal.sig_action_mask[signo - 1], sizeof(new_sig_mask));
+
+        if (!_sigismember(&lwp->signal.sig_action_nodefer, signo))
+            _sigaddset(&new_sig_mask, signo);
+
+        _thread_signal_mask(thread, LWP_SIG_MASK_CMD_BLOCK, &new_sig_mask, &save_sig_mask);
+
         if (_sigismember(&lwp->signal.sig_action_restart, signo))
         {
             arch_syscall_set_errno(exp_frame, EINTR, ERESTART);
@@ -996,7 +996,6 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, lwp_siginfo_
         /* short-circuit code for inactive task, ignored signals */
         if (terminated)
         {
-            RT_ASSERT(!lwp_sigismember(&lwp_sigset_init(LWP_SIG_NO_IGN_SET), signo));
             /* no one rely on this, then free the resource */
             if (value)
                 rt_free(value);

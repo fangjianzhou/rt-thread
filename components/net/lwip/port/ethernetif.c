@@ -68,6 +68,10 @@
 
 #include <ipc/completion.h>
 
+#define DBG_TAG              "eth"
+#define DBG_LVL              DBG_INFO
+#include <rtdbg.h>
+
 #if LWIP_IPV6
 #include "lwip/ethip6.h"
 #endif /* LWIP_IPV6 */
@@ -398,7 +402,7 @@ static int netdev_add(struct netif *lwip_netif)
 {
     int result = 0;
     struct netdev *netdev = RT_NULL;
-    char name[NETIF_NAMESIZE] = {0};
+    char name[NETIF_NAMESIZE + 1] = {0};
 
     RT_ASSERT(lwip_netif);
 
@@ -560,6 +564,7 @@ static err_t eth_netif_device_init(struct netif *netif)
 /* Keep old drivers compatible in RT-Thread */
 rt_err_t eth_device_init_with_flag(struct eth_device *dev, const char *name, rt_uint16_t flags)
 {
+    char ifname[NETIF_NAMESIZE + RT_NAME_MAX] = {0};
     struct netif* netif;
 #if LWIP_NETIF_HOSTNAME
     char *hostname = RT_NULL;
@@ -582,11 +587,23 @@ rt_err_t eth_device_init_with_flag(struct eth_device *dev, const char *name, rt_
     /* avoid send the same mail to mailbox */
     dev->rx_notice = 0x00;
     dev->parent.type = RT_Device_Class_NetIf;
-    /* register to RT-Thread device manager */
-    rt_device_register(&(dev->parent), name, RT_DEVICE_FLAG_RDWR);
-
     /* set name */
-    rt_strncpy(netif->name, name, NETIF_NAMESIZE);
+    rt_strncpy(ifname, name, NETIF_NAMESIZE + RT_NAME_MAX);
+    if (NETIF_NAMESIZE > RT_NAME_MAX)
+    {
+        ifname[RT_NAME_MAX - 1] = '\0';
+    }
+    else
+    {
+        ifname[NETIF_NAMESIZE - 1] = '\0';
+    }
+    if(rt_strlen(name) > rt_strlen(ifname))
+    {
+        LOG_W("eth name[%s] length is so long that have been cut into [%s].", name, ifname);
+    }
+    rt_strncpy(netif->name, ifname, NETIF_NAMESIZE);
+    /* register to RT-Thread device manager */
+    rt_device_register(&(dev->parent), ifname, RT_DEVICE_FLAG_RDWR);
 
     /* set hw address to 6 */
     netif->hwaddr_len   = 6;

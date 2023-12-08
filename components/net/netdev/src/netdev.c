@@ -88,17 +88,15 @@ int netdev_register(struct netdev *netdev, const char *name, void *user_data)
     netdev->status_callback = RT_NULL;
     netdev->addr_callback = RT_NULL;
 
-    if(rt_strlen(name) > RT_NAME_MAX)
-    {
-        char netdev_name[RT_NAME_MAX + 1] = {0};
-
-        rt_strncpy(netdev_name, name, RT_NAME_MAX);
-        LOG_E("netdev name[%s] length is so long that have been cut into [%s].", name, netdev_name);
-    }
-
     /* fill network interface device */
     rt_strncpy(netdev->name, name, RT_NAME_MAX);
+    netdev->name[RT_NAME_MAX - 1] = '\0';
     netdev->user_data = user_data;
+
+    if(rt_strlen(name) > RT_NAME_MAX - 1)
+    {
+        LOG_W("netdev name[%s] length is so long that have been cut into [%s].", name, netdev->name);
+    }
 
     /* initialize current network interface device single list */
     rt_slist_init(&(netdev->list));

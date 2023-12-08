@@ -92,8 +92,6 @@ static int win_netdev_add(void)
     rt_err_t result = RT_EOK;
     struct netdev* netdev = RT_NULL;
 
-    char name[RT_NAME_MAX] = {0};
-
     netdev = (struct netdev *)rt_calloc(1, sizeof(struct netdev));
     if (netdev == RT_NULL)
     {
@@ -102,8 +100,7 @@ static int win_netdev_add(void)
 
     sal_win_netdev_set_pf_info(netdev);
 
-    rt_strncpy(name, "win_e0", RT_NAME_MAX);
-    result = netdev_register(netdev, name, RT_NULL);
+    result = netdev_register(netdev, "win_e0", RT_NULL);
 
     netdev->flags = NETDEV_FLAG_UP | NETDEV_FLAG_LINK_UP | NETDEV_FLAG_INTERNET_UP;
     netdev->mtu = ETHERNET_MTU;

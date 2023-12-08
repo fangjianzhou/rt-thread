@@ -1029,6 +1029,7 @@ static void netdev_list_if(void)
 #define NETDEV_IFCONFIG_IMEI_MAX_LEN   8
 
     rt_ubase_t index;
+    char ip_buf[40];
     rt_slist_t *node  = RT_NULL;
     struct netdev *netdev = RT_NULL;
     struct netdev *cur_netdev_list = netdev_list;
@@ -1047,6 +1048,8 @@ static void netdev_list_if(void)
                    RT_NAME_MAX, netdev->name,
                    (netdev == netdev_default) ? " (Default)" : "");
         rt_kprintf("MTU: %d\n", netdev->mtu);
+
+        rt_memset(ip_buf, '\0', sizeof(ip_buf));
 
         /* 6 - MAC address, 8 - IEMI */
         if (netdev->hwaddr_len == NETDEV_IFCONFIG_MAC_MAX_LEN)
@@ -1071,8 +1074,6 @@ static void netdev_list_if(void)
                 {
                     rt_kprintf("%d", netdev->hwaddr[index]);
                 }
-
-
             }
         }
 
@@ -1091,9 +1092,10 @@ static void netdev_list_if(void)
         if (netdev->flags & NETDEV_FLAG_BROADCAST) rt_kprintf(" BROADCAST");
         if (netdev->flags & NETDEV_FLAG_IGMP) rt_kprintf(" IGMP");
         rt_kprintf("\n");
-        rt_kprintf("ip address: %s\n", inet_ntoa(netdev->ip_addr));
-        rt_kprintf("gw address: %s\n", inet_ntoa(netdev->gw));
-        rt_kprintf("net mask  : %s\n", inet_ntoa(netdev->netmask));
+
+        rt_kprintf("ip address: %s\n", inet_addr_ntop(netdev->ip_addr, ip_buf, sizeof(ip_buf)));
+        rt_kprintf("gw address: %s\n", inet_addr_ntop(netdev->gw, ip_buf, sizeof(ip_buf)));
+        rt_kprintf("net mask  : %s\n", inet_addr_ntop(netdev->netmask, ip_buf, sizeof(ip_buf)));
 
 #if NETDEV_IPV6
         {
@@ -1104,14 +1106,17 @@ static void netdev_list_if(void)
 
             if (!ip_addr_isany(addr))
             {
-                rt_kprintf("ipv6 link-local: %s %s\n", inet_ntoa(*addr),
-                        !ip_addr_isany(addr) ? "VALID" : "INVALID");
+                memset(ip_buf, '\0', 40);
+
+                rt_kprintf("ipv6 link-local: %s %s\n", inet_addr_ntop(*addr, ip_buf, sizeof(ip_buf)),
+                    !ip_addr_isany(addr) ? "VALID" : "INVALID");
 
                 for (i = 1; i < NETDEV_IPV6_NUM_ADDRESSES; i++)
                 {
+                    memset(ip_buf, '\0', 40);
                     addr = &netdev->ip6_addr[i];
-                    rt_kprintf("ipv6[%d] address: %s %s\n", i, inet_ntoa(*addr),
-                            !ip_addr_isany(addr) ? "VALID" : "INVALID");
+                    rt_kprintf("ipv6 link-local: %s %s\n", inet_addr_ntop(*addr, ip_buf, sizeof(ip_buf)),
+                        !ip_addr_isany(addr) ? "VALID" : "INVALID");
                 }
             }
         }
@@ -1119,7 +1124,7 @@ static void netdev_list_if(void)
 
         for (index = 0; index < NETDEV_DNS_SERVERS_NUM; index++)
         {
-            rt_kprintf("dns server #%d: %s\n", index, inet_ntoa(netdev->dns_servers[index]));
+            rt_kprintf("dns server #%d: %s\n", index, inet_addr_ntop(netdev->dns_servers[index], ip_buf, sizeof(ip_buf)));
         }
 
         if (rt_slist_next(node))
@@ -1246,6 +1251,7 @@ int netdev_cmd_ping(char* target_name, char *netdev_name, rt_uint32_t times, rt_
     struct netdev_ping_resp ping_resp;
     rt_uint32_t index;
     int ret = 0;
+    char ip_buf[40];
     rt_bool_t isbind = RT_FALSE;
 
     if (size == 0)
@@ -1292,30 +1298,31 @@ int netdev_cmd_ping(char* target_name, char *netdev_name, rt_uint32_t times, rt_
         rt_tick_t start_tick = 0;
 
         rt_memset(&ping_resp, 0x00, sizeof(struct netdev_ping_resp));
+        rt_memset(ip_buf, '\0', sizeof(ip_buf));
         start_tick = rt_tick_get();
         ret = netdev->ops->ping(netdev, (const char *)target_name, size, NETDEV_PING_RECV_TIMEO, &ping_resp, isbind);
         if (ret == -RT_ETIMEOUT)
         {
             rt_kprintf("ping: from %s icmp_seq=%d timeout\n",
-                (ip_addr_isany(&(ping_resp.ip_addr))) ? target_name : inet_ntoa(ping_resp.ip_addr), index);
+                (ip_addr_isany(&(ping_resp.ip_addr))) ? target_name : inet_addr_ntop(ping_resp.ip_addr, ip_buf, sizeof(ip_buf)), index);
         }
         else if (ret == -RT_ERROR)
         {
             rt_kprintf("ping: unknown %s %s\n",
                 (ip_addr_isany(&(ping_resp.ip_addr))) ? "host" : "address",
-                    (ip_addr_isany(&(ping_resp.ip_addr))) ? target_name : inet_ntoa(ping_resp.ip_addr));
+                    (ip_addr_isany(&(ping_resp.ip_addr))) ? target_name : inet_addr_ntop(ping_resp.ip_addr, ip_buf, sizeof(ip_buf)));
         }
         else
         {
             if (ping_resp.ttl == 0)
             {
                 rt_kprintf("%d bytes from %s icmp_seq=%d time=%d ms\n",
-                            ping_resp.data_len, inet_ntoa(ping_resp.ip_addr), index, ping_resp.ticks);
+                    ping_resp.data_len, inet_addr_ntop(ping_resp.ip_addr, ip_buf, sizeof(ip_buf)), index, ping_resp.ticks);
             }
             else
             {
                 rt_kprintf("%d bytes from %s icmp_seq=%d ttl=%d time=%d ms\n",
-                            ping_resp.data_len, inet_ntoa(ping_resp.ip_addr), index, ping_resp.ttl, ping_resp.ticks);
+                    ping_resp.data_len, inet_addr_ntop(ping_resp.ip_addr, ip_buf, sizeof(ip_buf)), index, ping_resp.ttl, ping_resp.ticks);
             }
         }
 
@@ -1352,6 +1359,7 @@ static void netdev_list_dns(void)
     unsigned int index = 0;
     struct netdev *netdev = RT_NULL;
     rt_slist_t *node  = RT_NULL;
+    char ip_buf[40];
 
     for (node = &(netdev_list->list); node; node = rt_slist_next(node))
     {
@@ -1363,7 +1371,8 @@ static void netdev_list_dns(void)
 
         for(index = 0; index < NETDEV_DNS_SERVERS_NUM; index++)
         {
-            rt_kprintf("dns server #%d: %s\n", index, inet_ntoa(netdev->dns_servers[index]));
+            rt_memset(ip_buf, '\0', sizeof(ip_buf));
+            rt_kprintf("dns server #%d: %s\n", index, inet_addr_ntop(netdev->dns_servers[index], ip_buf, sizeof(ip_buf)));
         }
 
         if (rt_slist_next(node))

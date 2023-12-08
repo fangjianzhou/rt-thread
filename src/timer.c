@@ -709,8 +709,12 @@ void rt_timer_check(void)
             /* add timer to temporary list  */
             rt_list_insert_after(&list, &(t->row[RT_TIMER_SKIP_LIST_LEVEL - 1]));
 
+            rt_raw_spin_unlock_nested(&_htimer_lock);
+
             /* call timeout function */
             t->timeout_func(t->parameter);
+
+            rt_raw_spin_lock_nested(&_htimer_lock);
 
             /* re-get tick */
             current_tick = rt_tick_get();

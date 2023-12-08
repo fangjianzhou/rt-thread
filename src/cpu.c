@@ -365,6 +365,54 @@ void rt_raw_spin_unlock_irqrestore_nested(struct rt_spinlock_nested *lock, rt_ba
 }
 RTM_EXPORT(rt_raw_spin_unlock_irqrestore_nested)
 
+void rt_raw_spin_lock_nested(struct rt_spinlock_nested *lock)
+{
+    struct rt_cpu *pcpu;
+
+    pcpu = rt_cpu_self();
+
+    if (pcpu && pcpu->current_thread != RT_NULL)
+    {
+        register rt_ubase_t lock_nested = rt_atomic_load(&(lock->lock_nested));
+
+        if (lock_nested == 0 || lock->thread != pcpu->current_thread)
+        {
+            rt_hw_spin_lock(&lock->lock);
+            lock->thread = pcpu->current_thread;
+#if defined(RT_DEBUGING_SPINLOCK)
+            lock->owner = pcpu->current_thread;
+            lock->pc = __GET_RETURN_ADDRESS;
+#endif /* RT_DEBUGING_SPINLOCK */
+        }
+        rt_atomic_add(&(lock->lock_nested), 1);
+    }
+}
+RTM_EXPORT(rt_raw_spin_lock_irqsave_nested)
+
+void rt_raw_spin_unlock_nested(struct rt_spinlock_nested *lock)
+{
+    struct rt_cpu *pcpu = rt_cpu_self();
+
+    if (pcpu && pcpu->current_thread != RT_NULL)
+    {
+        register rt_ubase_t lock_nested;
+
+        rt_atomic_sub(&(lock->lock_nested), 1);
+        lock_nested = rt_atomic_load(&(lock->lock_nested));
+
+        if (lock_nested == 0)
+        {
+#if defined(RT_DEBUGING_SPINLOCK)
+            lock->owner = __OWNER_MAGIC;
+            lock->pc = RT_NULL;
+#endif /* RT_DEBUGING_SPINLOCK */
+            lock->thread = RT_NULL;
+            rt_hw_spin_unlock(&lock->lock);
+        }
+    }
+}
+RTM_EXPORT(rt_raw_spin_unlock_nested)
+
 /**
  * @brief   This fucntion will return current cpu object.
  *

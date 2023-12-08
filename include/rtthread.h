@@ -540,6 +540,8 @@ rt_base_t rt_spin_lock_irqsave_nested(struct rt_spinlock_nested *lock);
 void rt_spin_unlock_irqrestore_nested(struct rt_spinlock_nested *lock, rt_base_t level);
 rt_base_t rt_raw_spin_lock_irqsave_nested(struct rt_spinlock_nested *lock);
 void rt_raw_spin_unlock_irqrestore_nested(struct rt_spinlock_nested *lock, rt_base_t level);
+void rt_raw_spin_lock_nested(struct rt_spinlock_nested *lock);
+void rt_raw_spin_unlock_nested(struct rt_spinlock_nested *lock);
 
 #else
 #define rt_spin_lock_init(lock)                                         do {RT_UNUSED(lock);} while (0)

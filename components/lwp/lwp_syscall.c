@@ -4762,6 +4762,7 @@ sysret_t sys_chdir(const char *path)
 #ifdef ARCH_MM_MMU
     int err = 0;
     int len = 0;
+    int errcode;
     char *kpath = RT_NULL;
 
     len = lwp_user_strlen(path);
@@ -4783,14 +4784,44 @@ sysret_t sys_chdir(const char *path)
     }
 
     err = chdir(kpath);
+    errcode = err != 0 ? GET_ERRNO() : 0;
 
     kmem_put(kpath);
 
-    return (err < 0 ? GET_ERRNO() : err);
+    return errcode;
 #else
     int ret = chdir(path);
     return (ret < 0 ? GET_ERRNO() : ret);
 #endif
+}
+
+sysret_t sys_fchdir(int fd)
+{
+    int errcode = -ENOSYS;
+#ifdef ARCH_MM_MMU
+#ifdef RT_USING_DFS_V2
+    int err = -1;
+    struct dfs_file *d;
+    char *kpath;
+
+    d = fd_get(fd);
+    if (!d || !d->vnode)
+    {
+        return -EBADF;
+    }
+    kpath = dfs_dentry_full_path(d->dentry);
+    if (!kpath)
+    {
+        return -EACCES;
+    }
+
+    err = chdir(kpath);
+    errcode = err != 0 ? GET_ERRNO() : 0;
+
+    kmem_put(kpath);
+#endif
+#endif
+    return errcode;
 }
 
 sysret_t sys_mkdir(const char *path, mode_t mode)
@@ -7102,6 +7133,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_getpgid),                          /* 210 */
     SYSCALL_SIGN(sys_getsid),
     SYSCALL_SIGN(sys_getppid),
+    SYSCALL_SIGN(sys_fchdir),
 };
 
 const void *lwp_get_sys_api(rt_uint32_t number)

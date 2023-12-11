@@ -11,6 +11,9 @@
  * 2023-09-15     xqyjlj       perf rt_hw_interrupt_disable/enable
  * 2023-11-21     Shell        Support wakeup_all
  */
+#define DBG_TAG "ipc.waitqueue"
+#define DBG_LVL DBG_INFO
+#include <rtdbg.h>
 
 #include <stdint.h>
 #include <rthw.h>
@@ -147,7 +150,7 @@ void rt_wqueue_wakeup_all(rt_wqueue_t *queue, void *key)
 
     if (!(rt_list_isempty(queue_list)))
     {
-        for (node = queue_list->next; node != queue_list; node = node->next)
+        for (node = queue_list->next; node != queue_list; )
         {
             entry = rt_list_entry(node, struct rt_wqueue_node, list);
             if (entry->wakeup(entry, key) == 0)
@@ -160,8 +163,17 @@ void rt_wqueue_wakeup_all(rt_wqueue_t *queue, void *key)
                 if (!rt_thread_resume(entry->polling_thread))
                 {
                     need_schedule = 1;
-                    /* waker will remove wait node from waitq after woken up */
                 }
+                else
+                {
+                    LOG_W("%s: Thread resume failed", __func__);
+                }
+                node = node->next;
+                rt_list_remove(&entry->list);
+            }
+            else
+            {
+                node = node->next;
             }
         }
     }

@@ -592,7 +592,7 @@ int dfs_dup_to(int oldfd, struct dfs_fdtable *fdtab)
         goto exit;
     }
     /* get a new fd*/
-    newfd = fd_slot_alloc(fdtab, DFS_STDIO_OFFSET);
+    newfd = _fdt_slot_alloc(fdtab, DFS_STDIO_OFFSET);
     if (newfd >= 0)
     {
         fdtab->fds[newfd] = fdt->fds[oldfd];

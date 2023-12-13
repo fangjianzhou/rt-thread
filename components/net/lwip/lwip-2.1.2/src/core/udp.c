@@ -79,7 +79,7 @@ static u16_t udp_port = UDP_LOCAL_PORT_RANGE_START;
 /* The list of UDP PCBs */
 /* exported in udp.h (was static) */
 struct udp_pcb *udp_pcbs;
-
+struct udp_pcb *udp_sentinel_node = NULL; /* Record the last node */
 /**
  * Initialize this module.
  */
@@ -179,6 +179,75 @@ udp_input_local_match(struct udp_pcb *pcb, struct netif *inp, u8_t broadcast)
 }
 
 /**
+ * his is load balancing
+ *
+ * @param prev precursor node
+ * @param pcb current nodes
+ */
+#if SO_REUSE
+static void
+udp_balance(struct udp_pcb *prev, struct udp_pcb *pcb)
+{
+  struct udp_pcb *n_pcb;
+
+  if ((udp_sentinel_node != NULL) && prev != NULL)
+  {
+    if (pcb == udp_sentinel_node)
+      return ;
+
+    prev->next = pcb->next;
+    pcb->next = NULL;
+    udp_sentinel_node->next = pcb;
+  }
+  else if (udp_sentinel_node != NULL)
+  {
+    if (pcb == udp_sentinel_node)
+      return ;
+
+    if (pcb->next != NULL)
+    {
+      udp_pcbs = pcb->next;
+      pcb->next = udp_sentinel_node->next;
+      udp_sentinel_node->next = pcb;
+    }
+  }
+  else
+  {
+    if (prev != NULL)
+    {
+      prev->next = pcb->next;
+    }
+    else
+    {
+      if (pcb->next != NULL)
+      {
+        udp_pcbs = pcb->next;
+      }
+      else
+      {
+        return ;
+      }
+    }
+
+    n_pcb = pcb;
+
+    while(n_pcb->next != RT_NULL)
+    {
+      n_pcb = n_pcb->next;
+    }
+
+    if (n_pcb != pcb)
+    {
+      pcb->next = n_pcb->next;
+      n_pcb->next = pcb;
+    }
+  }
+
+  udp_sentinel_node = pcb;
+}
+#endif
+
+/**
  * Process an incoming UDP datagram.
  *
  * Given an incoming UDP datagram (as a chain of pbufs) this function
@@ -265,6 +334,12 @@ udp_input(struct pbuf *p, struct netif *inp)
         if (uncon_pcb == NULL) {
           /* the first unconnected matching PCB */
           uncon_pcb = pcb;
+#if SO_REUSE
+          if (ip_get_option(pcb, SOF_REUSEPORT))
+          {
+            udp_balance(prev, pcb);
+          }
+#endif
 #if LWIP_IPV4
         } else if (broadcast && ip4_current_dest_addr()->addr == IPADDR_BROADCAST) {
           /* global broadcast address (only valid for IPv4; match was checked before) */
@@ -281,6 +356,10 @@ udp_input(struct pbuf *p, struct netif *inp)
         else if (!ip_addr_isany(&pcb->local_ip)) {
           /* prefer specific IPs over catch-all */
           uncon_pcb = pcb;
+          if (ip_get_option(pcb, SOF_REUSEPORT))
+          {
+            udp_balance(prev, pcb);
+          }
         }
 #endif /* SO_REUSE */
       }
@@ -289,15 +368,24 @@ udp_input(struct pbuf *p, struct netif *inp)
       if ((pcb->remote_port == src) &&
           (ip_addr_isany_val(pcb->remote_ip) ||
            ip_addr_cmp(&pcb->remote_ip, ip_current_src_addr()))) {
-        /* the first fully matching PCB */
-        if (prev != NULL) {
-          /* move the pcb to the front of udp_pcbs so that is
-             found faster next time */
-          prev->next = pcb->next;
-          pcb->next = udp_pcbs;
-          udp_pcbs = pcb;
-        } else {
-          UDP_STATS_INC(udp.cachehit);
+        if (ip_get_option(pcb, SOF_REUSEPORT))
+        {
+#if SO_REUSE
+          udp_balance(prev, pcb);
+#endif
+        }
+        else
+        {
+          /* the first fully matching PCB */
+          if (prev != NULL) {
+            /* move the pcb to the front of udp_pcbs so that is
+              found faster next time */
+            prev->next = pcb->next;
+            pcb->next = udp_pcbs;
+            udp_pcbs = pcb;
+          } else {
+            UDP_STATS_INC(udp.cachehit);
+          } 
         }
         break;
       }
@@ -991,8 +1079,10 @@ udp_bind(struct udp_pcb *pcb, const ip_addr_t *ipaddr, u16_t port)
            PCB is already bound to, unless *all* PCBs with that port have tha
            REUSEADDR flag set. */
 #if SO_REUSE
-        if (!ip_get_option(pcb, SOF_REUSEADDR) ||
-            !ip_get_option(ipcb, SOF_REUSEADDR))
+        if ((!ip_get_option(pcb, SOF_REUSEADDR) ||
+            !ip_get_option(ipcb, SOF_REUSEADDR)) &&
+            (!ip_get_option(pcb, SOF_REUSEPORT) &&
+              !ip_get_option(ipcb, SOF_REUSEPORT)))
 #endif /* SO_REUSE */
         {
           /* port matches that of PCB in list and REUSEADDR not set -> reject */
@@ -1020,6 +1110,11 @@ udp_bind(struct udp_pcb *pcb, const ip_addr_t *ipaddr, u16_t port)
     pcb->next = udp_pcbs;
     udp_pcbs = pcb;
   }
+
+  if (udp_sentinel_node == NULL) {
+    udp_sentinel_node = pcb;
+  }
+
   LWIP_DEBUGF(UDP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE, ("udp_bind: bound to "));
   ip_addr_debug_print_val(UDP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE, pcb->local_ip);
   LWIP_DEBUGF(UDP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE, (", port %"U16_F")\n", pcb->local_port));
@@ -1178,7 +1273,7 @@ udp_recv(struct udp_pcb *pcb, udp_recv_fn recv, void *recv_arg)
 void
 udp_remove(struct udp_pcb *pcb)
 {
-  struct udp_pcb *pcb2;
+  struct udp_pcb *pcb2 = NULL;
 
   LWIP_ASSERT_CORE_LOCKED();
 
@@ -1200,6 +1295,24 @@ udp_remove(struct udp_pcb *pcb)
       }
     }
   }
+
+  if (pcb2 != NULL)
+  {
+    for ( ;pcb2->next != NULL; pcb2 = pcb2->next);
+
+    udp_sentinel_node = pcb2;
+  }
+  else
+  {
+    if (udp_pcbs)
+    {
+      if (udp_pcbs->next == NULL)
+      {
+        udp_sentinel_node = udp_pcbs;
+      }
+    }
+  }
+
   memp_free(MEMP_UDP_PCB, pcb);
 }
 

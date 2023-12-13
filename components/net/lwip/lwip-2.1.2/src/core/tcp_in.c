@@ -106,6 +106,75 @@ static void tcp_remove_sacks_gt(struct tcp_pcb *pcb, u32_t seq);
 #endif /* LWIP_TCP_SACK_OUT */
 
 /**
+ * his is load balancing
+ *
+ * @param prev precursor node
+ * @param pcb current nodes
+ */
+#if SO_REUSE
+static void
+tcp_balance(struct tcp_pcb *prev, struct tcp_pcb *pcb)
+{
+  struct tcp_pcb *n_pcb;
+
+  if ((tcp_sentinel_node != NULL) && prev != NULL)
+  {
+    if (pcb == tcp_sentinel_node)
+      return ;
+
+    prev->next = pcb->next;
+    pcb->next = NULL;
+    tcp_sentinel_node->next = pcb;
+  }
+  else if (tcp_sentinel_node != NULL)
+  {
+    if (pcb == tcp_sentinel_node)
+      return ;
+
+    if (pcb->next != NULL)
+    {
+      tcp_listen_pcbs.pcbs = pcb->next;
+      pcb->next = tcp_sentinel_node->next;
+      tcp_sentinel_node->next = pcb;
+    }
+  }
+  else
+  {
+    if (prev != NULL)
+    {
+      prev->next = pcb->next;
+    }
+    else
+    {
+      if (pcb->next != NULL)
+      {
+        tcp_listen_pcbs.pcbs = pcb->next;
+      }
+      else
+      {
+        return ;
+      }
+    }
+
+    n_pcb = pcb;
+
+    while(n_pcb->next != RT_NULL)
+    {
+      n_pcb = n_pcb->next;
+    }
+
+    if (n_pcb != pcb)
+    {
+      pcb->next = n_pcb->next;
+      n_pcb->next = pcb;
+    }
+  }
+
+  tcp_sentinel_node = pcb;
+}
+#endif
+
+/**
  * The initial input processing of TCP. It verifies the TCP header, demultiplexes
  * the segment between the PCBs and passes it on to tcp_process(), which implements
  * the TCP finite state machine. This function is called by the IP layer (in
@@ -334,6 +403,13 @@ tcp_input(struct pbuf *p, struct netif *inp)
 #endif /* SO_REUSE */
         } else if (IP_ADDR_PCB_VERSION_MATCH_EXACT(lpcb, ip_current_dest_addr())) {
           if (ip_addr_cmp(&lpcb->local_ip, ip_current_dest_addr())) {
+#if SO_REUSE
+            /* Load balancing. Currently polling is used */
+            if (ip_get_option(lpcb, SOF_REUSEPORT))
+            {
+              tcp_balance(prev, (struct tcp_pcb *)lpcb);
+            }
+#endif
             /* found an exact match */
             break;
           } else if (ip_addr_isany(&lpcb->local_ip)) {
@@ -341,6 +417,12 @@ tcp_input(struct pbuf *p, struct netif *inp)
 #if SO_REUSE
             lpcb_any = lpcb;
             lpcb_prev = prev;
+            /* Load balancing. Currently polling is used */
+            if (ip_get_option(lpcb, SOF_REUSEPORT))
+            {
+              tcp_balance(prev, (struct tcp_pcb *)lpcb);
+            }
+            break;
 #else /* SO_REUSE */
             break;
 #endif /* SO_REUSE */
@@ -361,14 +443,19 @@ tcp_input(struct pbuf *p, struct netif *inp)
       /* Move this PCB to the front of the list so that subsequent
          lookups will be faster (we exploit locality in TCP segment
          arrivals). */
-      if (prev != NULL) {
-        ((struct tcp_pcb_listen *)prev)->next = lpcb->next;
-        /* our successor is the remainder of the listening list */
-        lpcb->next = tcp_listen_pcbs.listen_pcbs;
-        /* put this listening pcb at the head of the listening list */
-        tcp_listen_pcbs.listen_pcbs = lpcb;
-      } else {
-        TCP_STATS_INC(tcp.cachehit);
+      if (!ip_get_option(lpcb, SOF_REUSEPORT))
+      {
+        if (prev != NULL) {
+          ((struct tcp_pcb_listen *)prev)->next = lpcb->next;
+          /* our successor is the remainder of the listening list */
+          lpcb->next = tcp_listen_pcbs.listen_pcbs;
+          /* put this listening pcb at the head of the listening list */
+          tcp_listen_pcbs.listen_pcbs = lpcb;
+        } else {
+          if (prev == NULL) {
+            TCP_STATS_INC(tcp.cachehit);
+          } 
+        }
       }
 
       LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: packed for LISTENing connection.\n"));

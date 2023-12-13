@@ -99,6 +99,7 @@ struct ip_pcb {
 #define SOF_REUSEADDR     0x04U  /* allow local address reuse */
 #define SOF_KEEPALIVE     0x08U  /* keep connections alive */
 #define SOF_BROADCAST     0x20U  /* permit to send and to receive broadcast messages (see IP_SOF_BROADCAST option) */
+#define SOF_REUSEPORT     0x40U  /* allow local address & port reuse */
 
 /* These flags are inherited (e.g. from a listen-pcb to a connection-pcb): */
 #define SOF_INHERITED   (SOF_REUSEADDR|SOF_KEEPALIVE)

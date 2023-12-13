@@ -3144,6 +3144,8 @@ lwip_sockopt_to_ipopt(int optname)
     return SOF_KEEPALIVE;
   case SO_REUSEADDR:
     return SOF_REUSEADDR;
+  case SO_REUSEPORT:
+    return SOF_REUSEPORT;
   default:
     LWIP_ASSERT("Unknown socket option", 0);
     return 0;
@@ -3793,6 +3795,19 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
           }
         }
         break;
+#if SO_REUSE
+        case SO_REUSEPORT:
+          if (sock->conn)
+          {
+            if ((*(int *)optval))
+              sock->conn->pcb.tcp->so_options |= SOF_REUSEPORT;
+          }
+          else
+          {
+            err = ENOPROTOOPT;
+          }
+          break;
+#endif
         default:
           LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_setsockopt(%d, SOL_SOCKET, UNIMPL: optname=0x%x, ..)\n",
                                       s, optname));

@@ -176,6 +176,8 @@ union tcp_listen_pcbs_t tcp_listen_pcbs;
 struct tcp_pcb *tcp_active_pcbs;
 /** List of all TCP PCBs in TIME-WAIT state */
 struct tcp_pcb *tcp_tw_pcbs;
+/* Record the last node of listen */
+struct tcp_pcb *tcp_sentinel_node = NULL;
 
 /** An array with all (non-temporary) PCB lists, mainly used for smaller code size */
 struct tcp_pcb **const tcp_pcb_lists[] = {&tcp_listen_pcbs.pcbs, &tcp_bound_pcbs,
@@ -719,8 +721,10 @@ tcp_bind(struct tcp_pcb *pcb, const ip_addr_t *ipaddr, u16_t port)
           /* Omit checking for the same port if both pcbs have REUSEADDR set.
              For SO_REUSEADDR, the duplicate-check for a 5-tuple is done in
              tcp_connect. */
-          if (!ip_get_option(pcb, SOF_REUSEADDR) ||
-              !ip_get_option(cpcb, SOF_REUSEADDR))
+          if (((!ip_get_option(pcb, SOF_REUSEADDR) ||
+              !ip_get_option(cpcb, SOF_REUSEADDR)) &&
+              (!ip_get_option(pcb, SOF_REUSEPORT) &&
+                !ip_get_option(cpcb, SOF_REUSEPORT))))
 #endif /* SO_REUSE */
           {
             /* @todo: check accept_any_ip_version */
@@ -871,7 +875,7 @@ tcp_listen_with_backlog_and_err(struct tcp_pcb *pcb, u8_t backlog, err_t *err)
     for (lpcb = tcp_listen_pcbs.listen_pcbs; lpcb != NULL; lpcb = lpcb->next) {
       if ((lpcb->local_port == pcb->local_port) &&
           ip_addr_cmp(&lpcb->local_ip, &pcb->local_ip)) {
-        /* this address/port is already used */
+          /* this address/port is already used */
         lpcb = NULL;
         res = ERR_USE;
         goto done;
@@ -912,6 +916,9 @@ tcp_listen_with_backlog_and_err(struct tcp_pcb *pcb, u8_t backlog, err_t *err)
   tcp_backlog_set(lpcb, backlog);
 #endif /* TCP_LISTEN_BACKLOG */
   TCP_REG(&tcp_listen_pcbs.pcbs, (struct tcp_pcb *)lpcb);
+  if (tcp_sentinel_node == NULL)
+    tcp_sentinel_node = (struct tcp_pcb *)lpcb;
+
   res = ERR_OK;
 done:
   if (err != NULL) {
@@ -2168,6 +2175,28 @@ tcp_pcb_purge(struct tcp_pcb *pcb)
 }
 
 /**
+ * Record the last node
+ *
+ * @param pcblist PCB list to purge.
+ * @param pcb tcp_pcb to purge. The pcb itself is NOT deallocated!
+ */
+void
+tcp_record_pcb_last_node(struct tcp_pcb **pcblist)
+{
+  struct tcp_pcb *pcbs = *pcblist;
+
+  if (pcbs == NULL)
+    return ;
+
+  while(pcbs->next != NULL)
+  {
+    pcbs = pcbs->next;
+  }
+
+  tcp_sentinel_node = pcbs;
+}
+
+/**
  * Purges the PCB and removes it from a PCB list. Any delayed ACKs are sent first.
  *
  * @param pcblist PCB list to purge.
@@ -2180,6 +2209,8 @@ tcp_pcb_remove(struct tcp_pcb **pcblist, struct tcp_pcb *pcb)
   LWIP_ASSERT("tcp_pcb_remove: invalid pcblist", pcblist != NULL);
 
   TCP_RMV(pcblist, pcb);
+
+  tcp_record_pcb_last_node(pcblist);
 
   tcp_pcb_purge(pcb);
 

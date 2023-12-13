@@ -338,6 +338,7 @@ extern struct tcp_pcb *tcp_active_pcbs;  /* List of all TCP PCBs that are in a
               state in which they accept or send
               data. */
 extern struct tcp_pcb *tcp_tw_pcbs;      /* List of all TCP PCBs in TIME-WAIT. */
+extern struct tcp_pcb *tcp_sentinel_node; /* Record the last node of listen */
 
 #define NUM_TCP_PCB_LISTS_NO_TIME_WAIT  3
 #define NUM_TCP_PCB_LISTS               4

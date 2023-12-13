@@ -390,6 +390,7 @@ rt_lwp_t lwp_create(rt_base_t flags)
 #ifdef RT_USING_SMP
         new_lwp->bind_cpu = RT_CPUS_NR;
 #endif
+        new_lwp->exe_file = RT_NULL;
         rt_list_init(&new_lwp->t_grp);
         rt_list_init(&new_lwp->pgrp_node);
         rt_list_init(&new_lwp->timer);
@@ -459,7 +460,7 @@ void lwp_free(struct rt_lwp* lwp)
      *   all the reference is clear)
      */
     LOG_D("lwp free: %p", lwp);
-
+    rt_free(lwp->exe_file);
     group = lwp_pgrp_find(lwp_pgid_get_byprocess(lwp));
     if (group)
         lwp_pgrp_remove(group, lwp);

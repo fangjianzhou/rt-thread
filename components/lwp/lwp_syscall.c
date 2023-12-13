@@ -1984,6 +1984,14 @@ static void lwp_struct_copy(struct rt_lwp *dst, struct rt_lwp *src)
     dst->term_ctrlterm = src->term_ctrlterm;
 
     rt_memcpy(dst->cmd, src->cmd, RT_NAME_MAX);
+    if (src->exe_file)
+    {
+        if (dst->exe_file)
+        {
+            rt_free(dst->exe_file);
+        }
+        dst->exe_file = strndup(src->exe_file, DFS_PATH_MAX);
+    }
 
     rt_memcpy(&dst->signal.sig_action, &src->signal.sig_action, sizeof(dst->signal.sig_action));
     rt_memcpy(&dst->signal.sig_action_mask, &src->signal.sig_action_mask, sizeof(dst->signal.sig_action_mask));
@@ -2728,6 +2736,8 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
 
         strncpy(thread->parent.name, run_name + last_backslash, RT_NAME_MAX);
         strncpy(lwp->cmd, new_lwp->cmd, RT_NAME_MAX);
+        rt_free(lwp->exe_file);
+        lwp->exe_file = strndup(new_lwp->exe_file, DFS_PATH_MAX);
 
         rt_pages_free(page, 0);
 

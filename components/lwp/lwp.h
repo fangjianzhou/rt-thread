@@ -177,6 +177,7 @@ struct rt_lwp
     int D_leader; /* boolean value for session group_leader*/
     struct dfs_fdtable fdt;
     char cmd[RT_NAME_MAX];
+    char *exe_file;                 /* process file path */
 
     /* POSIX signal */
     struct lwp_signal signal;

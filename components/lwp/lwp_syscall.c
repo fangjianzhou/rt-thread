@@ -5360,12 +5360,16 @@ sysret_t sys_getrandom(void *buf, size_t buflen, unsigned int flags)
     return ret;
 }
 
+/**
+ *  readlink() places the contents of the symbolic link pathname in the buffer buf, which has size bufsiz.
+ *  readlink() does not append a null byte to buf.
+ *  It will (silently) truncate the contents(to a length of bufsiz characters),
+ *  in case the buffer is too small to hold all of the contents.
+ */
 ssize_t sys_readlink(char* path, char *buf, size_t bufsz)
 {
     size_t len, copy_len;
     int err, rtn;
-    int fd = -1;
-    struct dfs_file *d;
     char *copy_path;
 
     len = lwp_user_strlen(path);
@@ -5388,91 +5392,27 @@ ssize_t sys_readlink(char* path, char *buf, size_t bufsz)
     copy_len = lwp_get_from_user(copy_path, path, len);
     copy_path[copy_len] = '\0';
 
-    /* musl __procfdname */
-    err = sscanf(copy_path, "/proc/self/fd/%d", &fd);
-
-    if (err != 1)
+    char *link_fn = (char *)rt_malloc(DFS_PATH_MAX);
+    if (link_fn)
     {
-        rtn = 0;
-        if (access(copy_path, 0))
+        err = dfs_file_readlink(copy_path, link_fn, DFS_PATH_MAX);
+        if (err > 0)
         {
-            rtn = -ENOENT;
-            LOG_E("readlink: path not is /proc/self/fd/* and path not exits, call by musl __procfdname()?");
+            rtn = lwp_put_to_user(buf, link_fn, bufsz > err ? err : bufsz - 1);
         }
         else
         {
-#ifdef RT_USING_DFS_V2
-            char *link_fn = (char *)rt_malloc(DFS_PATH_MAX);
-            if (link_fn)
-            {
-                err = dfs_file_readlink(copy_path, link_fn, DFS_PATH_MAX);
-                if (err > 0)
-                {
-                    rtn = lwp_put_to_user(buf, link_fn, bufsz > err ? err : bufsz - 1);
-                }
-                else
-                {
-                    rtn = -EIO;
-                }
-                rt_free(link_fn);
-            }
-            else
-            {
-                rtn = -ENOMEM;
-            }
-#else
-            rtn = lwp_put_to_user(buf, copy_path, copy_len);
-#endif
+            rtn = -EIO;
         }
-        rt_free(copy_path);
-        return rtn;
+        rt_free(link_fn);
     }
     else
     {
-        rt_free(copy_path);
+        rtn = -ENOMEM;
     }
 
-    d = fd_get(fd);
-    if (!d)
-    {
-        return -EBADF;
-    }
-
-    if (!d->vnode)
-    {
-        return -EBADF;
-    }
-
-#ifdef RT_USING_DFS_V2
-    {
-        char *fullpath = dfs_dentry_full_path(d->dentry);
-        if (fullpath)
-        {
-            copy_len = strlen(fullpath);
-            if (copy_len > bufsz)
-            {
-                copy_len = bufsz;
-            }
-
-            bufsz = lwp_put_to_user(buf, fullpath, copy_len);
-            rt_free(fullpath);
-        }
-        else
-        {
-            bufsz = 0;
-        }
-    }
-#else
-    copy_len = strlen(d->vnode->fullpath);
-    if (copy_len > bufsz)
-    {
-        copy_len = bufsz;
-    }
-
-    bufsz = lwp_put_to_user(buf, d->vnode->fullpath, copy_len);
-#endif
-
-    return bufsz;
+    rt_free(copy_path);
+    return rtn;
 }
 
 sysret_t sys_sched_setaffinity(pid_t pid, size_t size, void *set)

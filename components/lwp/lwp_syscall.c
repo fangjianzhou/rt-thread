@@ -6519,10 +6519,8 @@ sysret_t sys_chmod(const char *fileName, mode_t mode)
 {
     char *copy_fileName;
     size_t len_fileName, copy_len_fileName;
-#ifdef RT_USING_DFS_V2
     struct dfs_attr attr;
     attr.st_mode = mode;
-#endif
     int ret = 0;
 
     len_fileName = lwp_user_strlen(fileName);
@@ -6539,11 +6537,7 @@ sysret_t sys_chmod(const char *fileName, mode_t mode)
 
     copy_len_fileName = lwp_get_from_user(copy_fileName, (void *)fileName, len_fileName);
     copy_fileName[copy_len_fileName] = '\0';
-#ifdef RT_USING_DFS_V2
     ret = dfs_file_setattr(copy_fileName, &attr);
-#else
-    SET_ERRNO(EFAULT);
-#endif
     rt_free(copy_fileName);
 
     return (ret < 0 ? GET_ERRNO() : ret);

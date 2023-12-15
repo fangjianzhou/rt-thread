@@ -25,6 +25,10 @@
 #include <rtatomic.h>
 #include <rtdevice.h>
 
+#ifndef ATTR_MODE_SET
+#define ATTR_MODE_SET	(1 << 6)
+#endif
+
 #ifndef ATTR_ATIME_SET
 #define ATTR_ATIME_SET	(1 << 7)
 #endif

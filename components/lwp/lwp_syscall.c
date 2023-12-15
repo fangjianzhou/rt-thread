@@ -6515,30 +6515,33 @@ sysret_t sys_utimensat(int __fd, const char *__path, const struct timespec __tim
 #endif
 }
 
-sysret_t sys_chmod(const char *fileName, mode_t mode)
+sysret_t sys_chmod(const char *pathname, mode_t mode)
 {
-    char *copy_fileName;
-    size_t len_fileName, copy_len_fileName;
-    struct dfs_attr attr;
-    attr.st_mode = mode;
+    char *copy_file;
+    size_t len_file, copy_len_file;
+    struct dfs_attr attr = {0};
     int ret = 0;
 
-    len_fileName = lwp_user_strlen(fileName);
-    if (len_fileName <= 0)
+    len_file = lwp_user_strlen(pathname);
+    if (len_file <= 0)
     {
         return -EFAULT;
     }
 
-    copy_fileName = (char*)rt_malloc(len_fileName + 1);
-    if (!copy_fileName)
+    copy_file = (char*)rt_malloc(len_file + 1);
+    if (!copy_file)
     {
         return -ENOMEM;
     }
 
-    copy_len_fileName = lwp_get_from_user(copy_fileName, (void *)fileName, len_fileName);
-    copy_fileName[copy_len_fileName] = '\0';
-    ret = dfs_file_setattr(copy_fileName, &attr);
-    rt_free(copy_fileName);
+    copy_len_file = lwp_get_from_user(copy_file, (void *)pathname, len_file);
+
+    attr.st_mode = mode;
+    attr.ia_valid |= ATTR_MODE_SET;
+
+    copy_file[copy_len_file] = '\0';
+    ret = dfs_file_setattr(copy_file, &attr);
+    rt_free(copy_file);
 
     return (ret < 0 ? GET_ERRNO() : ret);
 }

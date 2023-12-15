@@ -49,7 +49,7 @@ static int _get_parent_path(const char *fullpath, char *path)
 {
     int len = 0;
     char *str = 0;
-    
+
     str = strrchr(fullpath, '/');
     if (str)
     {
@@ -267,12 +267,6 @@ char *dfs_file_realpath(struct dfs_mnt **mnt, const char *fullpath, int mode)
             path[path_len + len] = '\0';
             index += len;
 
-            /* the last should by mode process. */
-            if ((tmp_path[index] == '\0') && (mode == DFS_REALPATH_EXCEPT_LAST))
-            {
-                break;
-            }
-
             tmp_mnt = dfs_mnt_lookup(path);
             if (tmp_mnt == RT_NULL)
             {
@@ -281,10 +275,17 @@ char *dfs_file_realpath(struct dfs_mnt **mnt, const char *fullpath, int mode)
 
             *mnt = tmp_mnt;
 
+            /* the last should by mode process. */
+            if ((tmp_path[index] == '\0') && (mode == DFS_REALPATH_EXCEPT_LAST))
+            {
+                break;
+            }
+
             link_len = _try_readlink(path, *mnt, link_fn);
             if (link_len > 0)
             {
                 int ret = _insert_link_path(link_fn, link_len, tmp_path, &index);
+
                 if (ret == 1)
                 {
                     /* link_fn[0] == '/' */

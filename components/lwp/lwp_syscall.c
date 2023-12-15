@@ -6543,6 +6543,46 @@ sysret_t sys_chmod(const char *fileName, mode_t mode)
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
+sysret_t sys_chown(const char *pathname, uid_t owner, gid_t group)
+{
+    char *copy_file;
+    size_t len_file, copy_len_file;
+    struct dfs_attr attr = {0};
+    int ret = 0;
+
+    len_file = lwp_user_strlen(pathname);
+    if (len_file <= 0)
+    {
+        return -EFAULT;
+    }
+
+    copy_file = (char*)rt_malloc(len_file + 1);
+    if (!copy_file)
+    {
+        return -ENOMEM;
+    }
+
+    copy_len_file = lwp_get_from_user(copy_file, (void *)pathname, len_file);
+
+    if(owner >= 0)
+    {
+        attr.st_uid = owner;
+        attr.ia_valid |= ATTR_UID_SET;
+    }
+
+    if(group >= 0)
+    {
+        attr.st_gid = group;
+        attr.ia_valid |= ATTR_GID_SET;
+    }
+
+    copy_file[copy_len_file] = '\0';
+    ret = dfs_file_setattr(copy_file, &attr);
+    rt_free(copy_file);
+
+    return (ret < 0 ? GET_ERRNO() : ret);
+}
+
 #include <sys/reboot.h>
 sysret_t sys_reboot(int magic, int magic2, int type)
 {
@@ -7138,6 +7178,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_getsid),
     SYSCALL_SIGN(sys_getppid),
     SYSCALL_SIGN(sys_fchdir),
+    SYSCALL_SIGN(sys_chown),
 };
 
 const void *lwp_get_sys_api(rt_uint32_t number)

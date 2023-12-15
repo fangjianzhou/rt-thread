@@ -33,6 +33,14 @@
 #define ATTR_MTIME_SET	(1 << 8)
 #endif
 
+#ifndef ATTR_UID_SET
+#define ATTR_UID_SET	(1 << 9)
+#endif
+
+#ifndef ATTR_GID_SET
+#define ATTR_GID_SET	(1 << 10)
+#endif
+
 #ifndef AT_SYMLINK_NOFOLLOW
 #define AT_SYMLINK_NOFOLLOW 0x100
 #endif

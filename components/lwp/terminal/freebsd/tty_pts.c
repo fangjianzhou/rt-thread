@@ -347,7 +347,7 @@ static int ptsdev_ioctl(struct lwp_tty *tp, rt_ubase_t cmd, void *data,
         case TIOCSIG:
             /* Signal the foreground process group. */
             sig = *(int *)data;
-            if (sig < 1 || sig >= NSIG)
+            if (sig < 1 || sig >= _LWP_NSIG)
                 return (EINVAL);
 
             tty_lock(tp);
@@ -627,7 +627,7 @@ static void ptsdrv_outwakeup(struct lwp_tty *tp)
     struct pts_softc *psc = tty_softc(tp);
 
     cv_broadcast(&psc->pts_outwait);
-    rt_wqueue_wakeup_all(&psc->pts_outpoll, (void *)POLL_IN);
+    rt_wqueue_wakeup_all(&psc->pts_outpoll, (void *)POLLIN);
 }
 
 static void ptsdrv_inwakeup(struct lwp_tty *tp)
@@ -635,7 +635,7 @@ static void ptsdrv_inwakeup(struct lwp_tty *tp)
     struct pts_softc *psc = tty_softc(tp);
 
     cv_broadcast(&psc->pts_inwait);
-    rt_wqueue_wakeup_all(&psc->pts_inpoll, (void *)POLL_OUT);
+    rt_wqueue_wakeup_all(&psc->pts_inpoll, (void *)POLLOUT);
 }
 
 static int ptsdrv_open(struct lwp_tty *tp)
@@ -707,8 +707,8 @@ static void ptsdrv_free(void *softc)
     crfree(psc->pts_cred);
 #endif
 
-    rt_wqueue_wakeup_all(&psc->pts_inpoll, (void *)POLL_HUP);
-    rt_wqueue_wakeup_all(&psc->pts_outpoll, (void *)POLL_HUP);
+    rt_wqueue_wakeup_all(&psc->pts_inpoll, (void *)POLLHUP);
+    rt_wqueue_wakeup_all(&psc->pts_outpoll, (void *)POLLHUP);
 
     rt_free(psc);
 }

@@ -798,7 +798,7 @@ rt_inline int _fetch_robust_entry(struct robust_list **entry, struct robust_list
 
 static int _handle_futex_death(int *uaddr, rt_thread_t thread, rt_bool_t is_pi, rt_bool_t is_pending_op)
 {
-	int word, cword, nword;
+	int word, cword = 0, nword;
 	rt_err_t rc;
     struct rt_lwp *lwp;
     rt_futex_t futex;

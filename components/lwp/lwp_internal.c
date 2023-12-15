@@ -89,6 +89,7 @@ static rt_err_t _mutex_take_safe(rt_mutex_t mtx, rt_int32_t timeout, int flags)
     }
     else
     {
+        rc = -RT_EINVAL;
         LOG_W("%s: mtx should not be NULL", __func__);
         RT_ASSERT(0);
     }

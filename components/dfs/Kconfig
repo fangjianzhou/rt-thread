@@ -165,6 +165,12 @@ endif
         bool "Enable ReadOnly file system on flash"
         default n
 
+    if RT_USING_SMART
+        config RT_USING_DFS_PTYFS
+            bool "Using Pseudo-Teletype Filesystem (UNIX98 PTY)"
+            default y
+    endif
+
     config RT_USING_DFS_CROMFS
         bool "Enable ReadOnly compressed file system on flash"
         default n

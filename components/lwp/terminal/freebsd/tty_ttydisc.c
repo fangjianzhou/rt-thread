@@ -667,7 +667,7 @@ void ttydisc_modem(struct lwp_tty *tp, int open)
          */
         tp->t_flags |= TF_ZOMBIE;
 
-        tty_signal_sessleader(tp, SIGHUP);
+        lwp_tty_signal_sessleader(tp, SIGHUP);
         tty_flush(tp, FREAD | FWRITE);
     }
     else
@@ -1019,7 +1019,7 @@ int ttydisc_rint(struct lwp_tty *tp, char c, int flags)
             {
                 /* Generate SIGINT on break. */
                 tty_flush(tp, FREAD | FWRITE);
-                tty_signal_pgrp(tp, SIGINT);
+                lwp_tty_signal_pgrp(tp, SIGINT);
                 return 0;
             }
             else
@@ -1142,7 +1142,7 @@ int ttydisc_rint(struct lwp_tty *tp, char c, int flags)
             if (!CMP_FLAG(l, NOFLSH))
                 tty_flush(tp, FREAD | FWRITE);
             ttydisc_echo(tp, c, 0);
-            tty_signal_pgrp(tp, signal);
+            lwp_tty_signal_pgrp(tp, signal);
             return 0;
         }
     }
@@ -1417,51 +1417,51 @@ size_t ttydisc_getc(struct lwp_tty *tp, void *buf, size_t len)
     return (len);
 }
 
-#if USING_BSD_UIO
 int ttydisc_getc_uio(struct lwp_tty *tp, struct uio *uio)
 {
-	int error = 0;
-	ssize_t obytes = uio->uio_resid;
-	size_t len;
-	char buf[TTY_STACKBUF];
+    int error = 0;
+    ssize_t obytes = uio->uio_resid;
+    size_t len;
+    char buf[TTY_STACKBUF];
 
-	tty_assert_locked(tp);
+    tty_assert_locked(tp);
 
-	if (tp->t_flags & TF_STOPPED)
-		return 0;
+    if (tp->t_flags & TF_STOPPED)
+        return 0;
 
-	/*
-	 * When a TTY hook is attached, we cannot perform unbuffered
-	 * copying to userspace. Just call ttydisc_getc() and
-	 * temporarily store data in a shadow buffer.
-	 */
-	if (ttyhook_hashook(tp, getc_capture) ||
-	    ttyhook_hashook(tp, getc_inject)) {
-		while (uio->uio_resid > 0) {
-			/* Read to shadow buffer. */
-			len = ttydisc_getc(tp, buf,
-			    MIN(uio->uio_resid, sizeof buf));
-			if (len == 0)
-				break;
+    /*
+     * When a TTY hook is attached, we cannot perform unbuffered
+     * copying to userspace. Just call ttydisc_getc() and
+     * temporarily store data in a shadow buffer.
+     */
+    if (ttyhook_hashook(tp, getc_capture) || ttyhook_hashook(tp, getc_inject))
+    {
+        while (uio->uio_resid > 0)
+        {
+            /* Read to shadow buffer. */
+            len = ttydisc_getc(tp, buf, MIN(uio->uio_resid, sizeof buf));
+            if (len == 0)
+                break;
 
-			/* Copy to userspace. */
-			tty_unlock(tp);
-			error = uiomove(buf, len, uio);
-			tty_lock(tp);
+            /* Copy to userspace. */
+            tty_unlock(tp);
+            error = uiomove(buf, len, uio);
+            tty_lock(tp);
 
-			if (error != 0)
-				break;
-		}
-	} else {
-		error = ttyoutq_read_uio(&tp->t_outq, tp, uio);
+            if (error != 0)
+                break;
+        }
+    }
+    else
+    {
+        error = ttyoutq_read_uio(&tp->t_outq, tp, uio);
 
-		ttydisc_wakeup_watermark(tp);
-		atomic_add_long(&tty_nout, obytes - uio->uio_resid);
-	}
+        ttydisc_wakeup_watermark(tp);
+        rt_atomic_add(&tty_nout, obytes - uio->uio_resid);
+    }
 
-	return error;
+    return error;
 }
-#endif /* unused */
 
 size_t ttydisc_getc_poll(struct lwp_tty *tp)
 {

@@ -5,6 +5,8 @@ src = Glob('*.c')
 cwd = GetCurrentDir()
 CPPPATH = [cwd + "/include"]
 
+SrcRemove(src, ['pty.c'])
+
 group = DefineGroup('tty', src, depend = ['RT_USING_SMART', 'RT_USING_TTY'], CPPPATH = CPPPATH)
 
 Return('group')

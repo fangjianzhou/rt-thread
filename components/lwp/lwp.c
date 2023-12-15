@@ -1412,7 +1412,7 @@ pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
                 lwp_pgrp_insert(group, lwp);
                 if (self_lwp == RT_NULL)
                 {
-                    session = lwp_session_create(group);
+                    session = lwp_session_create(lwp);
                     lwp_session_insert(session, group);
                 }
                 else

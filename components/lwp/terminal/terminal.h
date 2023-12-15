@@ -280,6 +280,18 @@ lwp_tty_t lwp_tty_create(lwp_ttydevsw_t handle, void *softc);
 
 void lwp_tty_delete(lwp_tty_t tp);
 
+void lwp_tty_signal_sessleader(struct lwp_tty *tp, int sig);
+
+void lwp_tty_signal_pgrp(struct lwp_tty *tp, int sig);
+
+/**
+ * @brief Create a new pseudo-terminal multiplexer
+ *
+ * @param root_path path of root mount point of ptyfs
+ * @return rt_device_t new device object if succeed, otherwise NULL
+ */
+rt_err_t lwp_ptmx_init(rt_device_t ptmx_device, const char *root_path);
+
 rt_inline int ttydevsw_open(struct lwp_tty *tp)
 {
     tty_assert_locked(tp);

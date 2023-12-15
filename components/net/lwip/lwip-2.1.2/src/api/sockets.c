@@ -964,6 +964,7 @@ lwip_listen(int s, int backlog)
   return 0;
 }
 
+#ifdef LWIP_TIMESTAMPS
 /** fill a cmsg */
 static void
 put_cmsg(struct msghdr *msg, int level, int type, int len, void *data)
@@ -994,7 +995,6 @@ put_cmsg(struct msghdr *msg, int level, int type, int len, void *data)
   return;
 }
 
-#ifdef LWIP_TIMESTAMPS
 /* LWIPPTP_SWREQ_0032 */
 /** set sock timestamps flags */
 static void

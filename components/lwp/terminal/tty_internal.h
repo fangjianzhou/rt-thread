@@ -15,6 +15,8 @@
 
 extern struct cdevsw bsd_ttydev_methods;
 
+extern struct bsd_fileops bsd_ptsdev_methods;
+
 /* bsd devsw porting */
 void bsd_devsw_init(struct lwp_ttydevsw *tsw);
 
@@ -35,10 +37,12 @@ void tty_wakeup(struct lwp_tty *tp, int flags);
 
 void tty_info(struct lwp_tty *tp);
 
-void tty_signal_sessleader(struct lwp_tty *tp, int sig);
-void tty_signal_pgrp(struct lwp_tty *tp, int sig);
+void pts_set_lock(lwp_tty_t pts, rt_bool_t is_lock);
+rt_bool_t pts_is_locked(lwp_tty_t pts);
+int pts_get_pktmode(lwp_tty_t pts);
+int pts_alloc(int fflags, struct rt_thread *td, struct dfs_file *ptm_file);
 
-int lwp_tty_ioctl_adapter(lwp_tty_t tp, int cmd, void *args, rt_thread_t td);
+int lwp_tty_ioctl_adapter(lwp_tty_t tp, int cmd, int oflags, void *args, rt_thread_t td);
 
 int lwp_tty_set_ctrl_proc(lwp_tty_t tp, rt_thread_t td);
 int lwp_tty_assign_foreground(lwp_tty_t tp, rt_thread_t td, int pgid);

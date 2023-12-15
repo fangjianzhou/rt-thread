@@ -8,6 +8,11 @@
  * 2016-12-28     Bernard      first version
  * 2018-03-09     Bernard      Add protection for pt->triggered.
  * 2023-12-04     Shell        Fix return code and error verification
+ * 2023-12-14     Shell        When poll goes to sleep before the waitqueue has added a
+ *                             record and finished enumerating all the fd's, it may be
+ *                             incorrectly woken up. This is basically because the poll
+ *                             mechanism wakeup algorithm does not correctly distinguish
+ *                             the current wait state.
  */
 
 #include <stdint.h>
@@ -17,11 +22,16 @@
 #include "poll.h"
 
 struct rt_poll_node;
+enum rt_poll_status {
+    RT_POLL_STAT_INIT,
+    RT_POLL_STAT_TRIG,
+    RT_POLL_STAT_WAITING,
+};
 
 struct rt_poll_table
 {
     rt_pollreq_t req;
-    rt_uint32_t triggered; /* the waited thread whether triggered */
+    enum rt_poll_status status; /* the waited thread whether triggered */
     rt_thread_t polling_thread;
     struct rt_poll_node *nodes;
 };
@@ -43,7 +53,10 @@ static int __wqueue_pollwake(struct rt_wqueue_node *wait, void *key)
         return -1;
 
     pn = rt_container_of(wait, struct rt_poll_node, wqn);
-    pn->pt->triggered = 1;
+    if (pn->pt->status == RT_POLL_STAT_INIT)
+        return -1;
+
+    pn->pt->status = RT_POLL_STAT_TRIG;
 
     return __wqueue_default_wake(wait, key);
 }
@@ -72,7 +85,7 @@ static void _poll_add(rt_wqueue_t *wq, rt_pollreq_t *req)
 static void poll_table_init(struct rt_poll_table *pt)
 {
     pt->req._proc = _poll_add;
-    pt->triggered = 0;
+    pt->status = RT_POLL_STAT_INIT;
     pt->nodes = RT_NULL;
     pt->polling_thread = rt_thread_self();
 }
@@ -90,7 +103,7 @@ static int poll_wait_timeout(struct rt_poll_table *pt, int msec)
 
     level = rt_spin_lock_irqsave(&_spinlock);
 
-    if (timeout != 0 && !pt->triggered)
+    if (timeout != 0 && pt->status != RT_POLL_STAT_TRIG)
     {
         if (rt_thread_suspend_with_flag(thread, RT_INTERRUPTIBLE) == RT_EOK)
         {
@@ -106,11 +119,12 @@ static int poll_wait_timeout(struct rt_poll_table *pt, int msec)
             {
                 rt_set_errno(0);
             }
-
+            pt->status = RT_POLL_STAT_WAITING;
             rt_spin_unlock_irqrestore(&_spinlock, level);
 
             rt_schedule();
 
+            pt->status = RT_POLL_STAT_INIT;
             level = rt_spin_lock_irqsave(&_spinlock);
         }
     }
@@ -118,7 +132,7 @@ static int poll_wait_timeout(struct rt_poll_table *pt, int msec)
     ret = rt_get_errno();
     if (ret == RT_EINTR)
         ret = -RT_EINTR;
-    else if (pt->triggered)
+    else if (pt->status == RT_POLL_STAT_TRIG)
         ret = RT_EOK;
     else
         ret = -RT_ETIMEOUT;
@@ -183,7 +197,7 @@ static int poll_do(struct pollfd *fds, nfds_t nfds, struct rt_poll_table *pt, in
     {
         pf = fds;
         num = 0;
-        pt->triggered = 0;
+        pt->status = RT_POLL_STAT_INIT;
 
         for (n = 0; n < nfds; n ++)
         {

@@ -210,12 +210,13 @@ typedef int d_close_t(struct lwp_tty *tp, int fflag, int devtype,
 typedef void d_strategy_t(struct bio *bp);
 #endif
 
-typedef int d_ioctl_t(struct lwp_tty *tp, rt_ubase_t cmd, rt_caddr_t data, int fflag,
-                      struct rt_thread *td);
+typedef int d_ioctl_t(struct lwp_tty *tp, rt_ubase_t cmd, rt_caddr_t data,
+                      int fflag, struct rt_thread *td);
 
 typedef int d_read_t(struct lwp_tty *tp, struct uio *uio, int ioflag);
 typedef int d_write_t(struct lwp_tty *tp, struct uio *uio, int ioflag);
-typedef int d_poll_t(struct lwp_tty *tp, rt_pollreq_t *req, struct rt_thread *td);
+typedef int d_poll_t(struct lwp_tty *tp, rt_pollreq_t *req,
+                     struct rt_thread *td);
 
 #ifdef USING_BSD_KNOTE
 typedef int d_kqfilter_t(struct lwp_tty *tp, struct knote *kn);
@@ -309,15 +310,17 @@ rt_inline int uiomove(void *operand, int n, struct uio *uio)
     switch (uio->uio_rw)
     {
         case UIO_READ:
-            memcpy(uio->uio_iov->iov_base + uio->uio_offset, operand, n);
+            memcpy(uio->uio_iov->iov_base, operand, n);
             break;
         case UIO_WRITE:
-            memcpy(operand, uio->uio_iov->iov_base + uio->uio_offset, n);
+            memcpy(operand, uio->uio_iov->iov_base, n);
             break;
         default:
             return -1;
     }
 
+    uio->uio_iov->iov_base += n;
+    uio->uio_iov->iov_len--;
     uio->uio_offset += n;
     uio->uio_resid -= n;
     return 0;
@@ -643,11 +646,97 @@ enum bsd_ioctl_cmd
 #endif
 
 #ifndef CRTSCTS
-#define CRTSCTS    (CCTS_OFLOW | CRTS_IFLOW)
+#define CRTSCTS (CCTS_OFLOW | CRTS_IFLOW)
 #endif
 
 #ifndef howmany
 #define howmany(x, y) (((x) + ((y)-1)) / (y))
 #endif
+
+struct ucred
+{
+};
+#define NOCRED ((struct ucred *)0)  /* no credential available */
+#define FSCRED ((struct ucred *)-1) /* filesystem credential */
+
+/* convert from open() flags to/from fflags; convert O_RD/WR to FREAD/FWRITE */
+#include <fcntl.h>
+#define FFLAGS(oflags) ((oflags)&O_EXEC ? (oflags) : (oflags) + 1)
+#define OFLAGS(fflags) \
+    (((fflags) & (O_EXEC | O_PATH)) != 0 ? (fflags) : (fflags)-1)
+
+typedef int fo_rdwr_t(struct lwp_tty *tp, struct uio *uio,
+                      struct ucred *active_cred, int flags,
+                      struct rt_thread *td);
+typedef int fo_truncate_t(struct lwp_tty *tp, off_t length,
+                          struct ucred *active_cred, struct rt_thread *td);
+typedef int fo_ioctl_t(struct lwp_tty *tp, rt_ubase_t com, void *data,
+                       struct ucred *active_cred, int fflags, struct rt_thread *td);
+typedef int fo_poll_t(struct lwp_tty *tp, struct rt_pollreq *rq, struct ucred *active_cred,
+                      struct rt_thread *td);
+typedef int fo_stat_t(struct lwp_tty *tp, struct stat *sb,
+                      struct ucred *active_cred);
+typedef int fo_close_t(struct lwp_tty *tp, struct rt_thread *td);
+
+#ifdef USING_BSD_FO_EXT
+typedef int fo_chmod_t(struct file *fp, mode_t mode, struct ucred *active_cred,
+                       struct rt_thread *td);
+typedef int fo_chown_t(struct file *fp, uid_t uid, gid_t gid,
+                       struct ucred *active_cred, struct rt_thread *td);
+typedef int fo_sendfile_t(struct file *fp, int sockfd, struct uio *hdr_uio,
+                          struct uio *trl_uio, off_t offset, size_t nbytes,
+                          off_t *sent, int flags, struct rt_thread *td);
+typedef int fo_seek_t(struct file *fp, off_t offset, int whence,
+                      struct rt_thread *td);
+
+typedef int fo_kqfilter_t(struct file *fp, struct knote *kn);
+typedef int fo_fill_kinfo_t(struct file *fp, struct kinfo_file *kif,
+                            struct filedesc *fdp);
+typedef int fo_mmap_t(struct file *fp, vm_map_t map, vm_offset_t *addr,
+                      vm_size_t size, vm_prot_t prot, vm_prot_t cap_maxprot,
+                      int flags, vm_ooffset_t foff, struct rt_thread *td);
+typedef int fo_aio_queue_t(struct file *fp, struct kaiocb *job);
+
+typedef int fo_add_seals_t(struct file *fp, int flags);
+typedef int fo_get_seals_t(struct file *fp, int *flags);
+typedef int fo_fallocate_t(struct file *fp, off_t offset, off_t len,
+                           struct rt_thread *td);
+typedef int fo_fspacectl_t(struct file *fp, int cmd, off_t *offset,
+                           off_t *length, int flags, struct ucred *active_cred,
+                           struct rt_thread *td);
+typedef int fo_spare_t(struct file *fp);
+#endif /* USING_BSD_FO_EXT */
+
+typedef int fo_flags_t;
+
+struct bsd_fileops
+{
+    fo_rdwr_t *fo_read;
+    fo_rdwr_t *fo_write;
+    fo_truncate_t *fo_truncate;
+    fo_ioctl_t *fo_ioctl;
+    fo_poll_t *fo_poll;
+    fo_stat_t *fo_stat;
+    fo_close_t *fo_close;
+#ifdef USING_BSD_FO_EXT
+    fo_chmod_t *fo_chmod;
+    fo_chown_t *fo_chown;
+    fo_sendfile_t *fo_sendfile;
+    fo_seek_t *fo_seek;
+    fo_kqfilter_t *fo_kqfilter;
+    fo_fill_kinfo_t *fo_fill_kinfo;
+    fo_mmap_t *fo_mmap;
+    fo_aio_queue_t *fo_aio_queue;
+    fo_add_seals_t *fo_add_seals;
+    fo_get_seals_t *fo_get_seals;
+    fo_fallocate_t *fo_fallocate;
+    fo_fspacectl_t *fo_fspacectl;
+    fo_spare_t *fo_spares[8]; /* Spare slots */
+#endif
+    fo_flags_t fo_flags; /* DFLAG_* below */
+};
+
+#define DFLAG_PASSABLE	0x01	/* may be passed via unix sockets. */
+#define DFLAG_SEEKABLE	0x02	/* seekable / nonsequential */
 
 #endif /* __LWP_TTY_BSD_PORTING_H__ */

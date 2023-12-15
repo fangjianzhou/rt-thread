@@ -41,8 +41,18 @@ static int dfs_devfs_open(struct dfs_file *file)
     if (!S_ISDIR(file->vnode->mode))
     {
         rt_device_t device = RT_NULL;
+        struct dfs_dentry *de = file->dentry;
+        char *device_name = rt_malloc(DFS_PATH_MAX);
 
-        device = rt_device_find(&file->dentry->pathname[1]);
+        if (!device_name)
+        {
+            return -ENOMEM;
+        }
+
+        /* skip `/dev` */
+        rt_snprintf(device_name, DFS_PATH_MAX, "%s%s", de->mnt->fullpath + sizeof("/dev") - 1, de->pathname);
+
+        device = rt_device_find(device_name + 1);
         if (device)
         {
             file->vnode->data = device;

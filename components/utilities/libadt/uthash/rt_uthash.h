@@ -26,7 +26,7 @@
 #define uthash_strlen(s)   strlen(s)
 
 #else
-#define uthash_bzero(a, n) memset(a, '\0', n)
+#define uthash_bzero(a, n) rt_memset(a, '\0', n)
 #define uthash_strlen(s)   rt_strlen(s)
 
 #endif /* RT_UTHASH_CONFIG_COMPATIBILITY_FIRST */

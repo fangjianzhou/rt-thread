@@ -53,14 +53,7 @@ static rt_err_t ctty_readlink(struct rt_device *dev, char *buf, int len)
     return rc;
 }
 
-static int ctty_fops_open(struct dfs_file *file)
-{
-    return -ENXIO;
-}
-
-static struct dfs_file_ops ctty_file_ops = {
-    .open = ctty_fops_open,
-};
+static struct dfs_file_ops ctty_file_ops;
 
 /* character device for tty */
 #ifdef RT_USING_DEVICE_OPS

@@ -131,7 +131,7 @@ void rt_wqueue_wakeup(rt_wqueue_t *queue, void *key)
  * @param    key is the wakeup conditions, but it is not effective now, because
  *           default wakeup function always return 0.
  *           If user wants to use it, user should define their own wakeup
- * function.
+ *           function.
  */
 void rt_wqueue_wakeup_all(rt_wqueue_t *queue, void *key)
 {
@@ -166,10 +166,10 @@ void rt_wqueue_wakeup_all(rt_wqueue_t *queue, void *key)
                 }
                 else
                 {
-                    LOG_W("%s: Thread resume failed", __func__);
+                    /* wakeup happened too soon that waker hadn't slept */
+                    LOG_D("%s: Thread resume failed", __func__);
                 }
                 node = node->next;
-                rt_list_remove(&entry->list);
             }
             else
             {

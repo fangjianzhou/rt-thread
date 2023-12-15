@@ -77,7 +77,7 @@ static int tty_fops_close(struct dfs_file *file)
     int rc;
     lwp_tty_t tp;
     rt_device_t device;
-    int fflags = 0;
+    int fflags = FFLAGS(file->flags);
     int devtype = 0; /* unused */
 
     if (file->vnode && file->vnode->data)
@@ -111,7 +111,7 @@ static int tty_fops_ioctl(struct dfs_file *file, int cmd, void *arg)
     {
         device = (rt_device_t)file->vnode->data;
         tp = rt_container_of(device, struct lwp_tty, parent);
-        rc = lwp_tty_ioctl_adapter(tp, cmd, arg, rt_thread_self());
+        rc = lwp_tty_ioctl_adapter(tp, cmd, file->flags, arg, rt_thread_self());
     }
     else
     {
@@ -205,11 +205,15 @@ static ssize_t tty_fops_write(struct dfs_file *file, const void *buf,
 
         rc = count;
         error = bsd_ttydev_methods.d_write(tp, &uio, ioflags);
-        rc -= uio.uio_resid;
         if (error)
         {
+            rc = error;
             LOG_D("%s: failed to write %d bytes of data. error code %d",
                   __func__, uio.uio_resid, error);
+        }
+        else
+        {
+            rc -= uio.uio_resid;
         }
 
         /* reset file context */
@@ -260,20 +264,17 @@ static int tty_fops_poll(struct dfs_file *file, struct rt_pollreq *req)
 
 static int tty_fops_mmap(struct dfs_file *file, struct lwp_avl_struct *mmap)
 {
-    RT_ASSERT(0);
-    return -1;
+    return -EINVAL;
 }
 
 static int tty_fops_lock(struct dfs_file *file, struct file_lock *flock)
 {
-    RT_ASSERT(0);
-    return -1;
+    return -EINVAL;
 }
 
 static int tty_fops_flock(struct dfs_file *file, int operation, struct file_lock *flock)
 {
-    RT_ASSERT(0);
-    return -1;
+    return -EINVAL;
 }
 
 static struct dfs_file_ops tty_file_ops = {
@@ -300,12 +301,24 @@ rt_inline void device_setup(lwp_tty_t terminal)
 #endif
 }
 
-/* register device to DFS */
+/* register TTY device */
 rt_err_t lwp_tty_register(lwp_tty_t terminal, const char *name)
 {
     rt_err_t rc = -RT_ENOMEM;
-    char *tty_name;
-    tty_name = alloc_device_name(name);
+    const char *tty_name;
+    char *alloc_name;
+
+    if (terminal->t_devsw->tsw_flags & TF_NOPREFIX)
+    {
+        alloc_name = RT_NULL;
+        tty_name = name;
+    }
+    else
+    {
+        alloc_name = alloc_device_name(name);
+        tty_name = alloc_name;
+    }
+
     if (tty_name)
     {
         device_setup(terminal);
@@ -313,9 +326,11 @@ rt_err_t lwp_tty_register(lwp_tty_t terminal, const char *name)
         if (rc == RT_EOK)
         {
             terminal->parent.fops = &tty_file_ops;
+
+            LOG_D("%s() /dev/%s device registered", __func__, tty_name);
         }
 
-        rt_free(tty_name);
+        rt_free(alloc_name);
     }
     return rc;
 }
@@ -419,6 +434,7 @@ void lwp_tty_delete(lwp_tty_t tp)
     if (tp->t_mtx == &tp->t_mtxobj)
         rt_mutex_detach(&tp->t_mtxobj);
     ttydevsw_free(tp);
+    rt_device_unregister(&tp->parent);
     rt_free(tp);
 }
 

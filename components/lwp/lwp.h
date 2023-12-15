@@ -97,7 +97,7 @@ typedef struct rt_processgroup *rt_processgroup_t;
 
 struct rt_session {
     struct rt_object    object;
-    rt_processgroup_t   leader;
+    rt_lwp_t            leader;
     rt_list_t           processgroup;
     pid_t               sid;
     pid_t               foreground_pgid;
@@ -109,7 +109,7 @@ struct rt_processgroup {
     struct rt_object    object;
     rt_lwp_t            leader;
     rt_list_t           process;
-    rt_list_t           node;
+    rt_list_t           pgrp_list_node;
     pid_t               pgid;
     pid_t               sid;
     struct rt_session   *session;
@@ -317,7 +317,7 @@ rt_inline pid_t lwp_sid_get_byprocess(rt_lwp_t process)
 }
 
 rt_session_t lwp_session_find(pid_t sid);
-rt_session_t lwp_session_create(rt_processgroup_t leader);
+rt_session_t lwp_session_create(struct rt_lwp *leader);
 int lwp_session_delete(rt_session_t session);
 
 /**
@@ -336,6 +336,9 @@ int lwp_session_remove(rt_session_t session, rt_processgroup_t group);
 int lwp_session_move(rt_session_t session, rt_processgroup_t group);
 int lwp_session_update_children_info(rt_session_t session, pid_t sid);
 int lwp_session_set_foreground(rt_session_t session, pid_t pgid);
+
+/* complete the job control related bussiness on process exit */
+void lwp_jobctrl_on_exit(struct rt_lwp *lwp);
 
 #ifdef __cplusplus
 }

@@ -870,6 +870,8 @@ static void tty_rel_free(struct lwp_tty *tp)
         sx_xunlock(&tty_list_sx);
         destroy_dev_sched_cb(dev, tty_dealloc, tp);
     }
+#else
+    lwp_tty_delete(tp);
 #endif
 }
 
@@ -990,57 +992,6 @@ static int tty_drop_ctty(struct lwp_tty *tp, struct rt_lwp *p)
     return 0;
 }
 
-/*
- * Signalling processes.
- */
-
-void tty_signal_sessleader(struct lwp_tty *tp, int sig)
-{
-    struct rt_lwp *p;
-    struct rt_session *s;
-
-    tty_assert_locked(tp);
-    MPASS(sig >= 1 && sig < _LWP_NSIG);
-
-    /* Make signals start output again. */
-    tp->t_flags &= ~TF_STOPPED;
-    tp->t_termios.c_lflag &= ~FLUSHO;
-
-    /*
-     * Load s.leader exactly once to avoid race where s.leader is
-     * set to NULL by a concurrent invocation of killjobc() by the
-     * session leader.  Note that we are not holding t_session's
-     * lock for the read.
-     */
-    if ((s = tp->t_session) != NULL &&
-        (p = (void *)rt_atomic_load((rt_atomic_t *)&s->leader)) != NULL)
-    {
-        lwp_signal_kill(p, sig, SI_KERNEL, 0);
-    }
-}
-
-void tty_signal_pgrp(struct lwp_tty *tp, int sig)
-{
-    tty_assert_locked(tp);
-    MPASS(sig >= 1 && sig < _LWP_NSIG);
-
-    /* Make signals start output again. */
-    tp->t_flags &= ~TF_STOPPED;
-    tp->t_termios.c_lflag &= ~FLUSHO;
-
-#ifdef USING_BSD_SIGINFO
-    if (sig == SIGINFO && !(tp->t_termios.c_lflag & NOKERNINFO))
-        tty_info(tp);
-#endif /* USING_BSD_SIGINFO */
-
-    if (tp->t_pgrp != NULL)
-    {
-        PGRP_LOCK(tp->t_pgrp);
-        lwp_pgrp_signal_kill(tp->t_pgrp, sig, SI_KERNEL, 0);
-        PGRP_UNLOCK(tp->t_pgrp);
-    }
-}
-
 void tty_wakeup(struct lwp_tty *tp, int flags)
 {
 #ifdef USING_BSD_AIO
@@ -1144,7 +1095,7 @@ void tty_set_winsize(struct lwp_tty *tp, const struct winsize *wsz)
     if (memcmp(&tp->t_winsize, wsz, sizeof(*wsz)) == 0)
         return;
     tp->t_winsize = *wsz;
-    tty_signal_pgrp(tp, SIGWINCH);
+    lwp_tty_signal_pgrp(tp, SIGWINCH);
 }
 
 static int tty_generic_ioctl(struct lwp_tty *tp, rt_ubase_t cmd, void *data,

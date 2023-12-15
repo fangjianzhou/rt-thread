@@ -1437,7 +1437,7 @@ void lwp_request_thread_exit(rt_thread_t thread_to_exit)
         }
         if ((thread->stat & RT_THREAD_SUSPEND_MASK) == RT_THREAD_SUSPEND_MASK)
         {
-            thread->error = -RT_EINTR;
+            thread->error = RT_EINTR;
             rt_hw_dsb();
             rt_thread_wakeup(thread);
         }
@@ -1616,6 +1616,8 @@ static void _notify_parent(rt_lwp_t lwp)
 
 static void _resr_cleanup(struct rt_lwp *lwp)
 {
+    lwp_jobctrl_on_exit(lwp);
+
     LWP_LOCK(lwp);
     lwp_signal_detach(&lwp->signal);
 

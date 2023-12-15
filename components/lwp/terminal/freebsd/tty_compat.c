@@ -3,6 +3,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
+ * (tty_compat.c)
+ * The compatible layer which interacts with process management core (lwp)
+ *
  * Change Logs:
  * Date           Author       Notes
  * 2023-11-13     Shell        init ver.
@@ -12,9 +15,37 @@
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
-#include "tty_config.h"
-#include "tty_internal.h"
-#include "terminal.h"
+#include "../tty_config.h"
+#include "../tty_internal.h"
+#include "../terminal.h"
+
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 1994-1995 Søren Schmidt
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /* is the tty and session leader already binding ? */
 static rt_bool_t _is_already_binding(lwp_tty_t tp, rt_lwp_t p)
@@ -53,7 +84,10 @@ static rt_bool_t _is_tty_or_sess_busy(lwp_tty_t tp, rt_lwp_t p)
          * TODO: allow TTY stolen if the sess leader is killed while resource
          * had not been collected
          */
-        rc = RT_TRUE;
+        if (tp->t_session->leader == RT_NULL)
+            rc = RT_FALSE;
+        else
+            rc = RT_TRUE;
     }
     else
     {
@@ -211,6 +245,57 @@ int lwp_tty_assign_foreground(lwp_tty_t tp, rt_thread_t td, int pgid)
     return 0;
 }
 
+/**
+ * Signalling processes.
+ */
+
+void lwp_tty_signal_sessleader(struct lwp_tty *tp, int sig)
+{
+    struct rt_lwp *p;
+    struct rt_session *s;
+
+    tty_assert_locked(tp);
+    MPASS(sig >= 1 && sig < _LWP_NSIG);
+
+    /* Make signals start output again. */
+    tp->t_flags &= ~TF_STOPPED;
+    tp->t_termios.c_lflag &= ~FLUSHO;
+
+    /**
+     * Load s.leader exactly once to avoid race where s.leader is
+     * set to NULL by a concurrent invocation of killjobc() by the
+     * session leader.  Note that we are not holding t_session's
+     * lock for the read.
+     */
+    if ((s = tp->t_session) != NULL &&
+        (p = (void *)rt_atomic_load((rt_atomic_t *)&s->leader)) != NULL)
+    {
+        lwp_signal_kill(p, sig, SI_KERNEL, 0);
+    }
+}
+
+void lwp_tty_signal_pgrp(struct lwp_tty *tp, int sig)
+{
+    tty_assert_locked(tp);
+    MPASS(sig >= 1 && sig < _LWP_NSIG);
+
+    /* Make signals start output again. */
+    tp->t_flags &= ~TF_STOPPED;
+    tp->t_termios.c_lflag &= ~FLUSHO;
+
+#ifdef USING_BSD_SIGINFO
+    if (sig == SIGINFO && !(tp->t_termios.c_lflag & NOKERNINFO))
+        tty_info(tp);
+#endif /* USING_BSD_SIGINFO */
+
+    if (tp->t_pgrp != NULL)
+    {
+        PGRP_LOCK(tp->t_pgrp);
+        lwp_pgrp_signal_kill(tp->t_pgrp, sig, SI_KERNEL, 0);
+        PGRP_UNLOCK(tp->t_pgrp);
+    }
+}
+
 /* bsd_ttydev_methods.d_ioctl */
 
 rt_inline size_t _copy_to_user(void *to, void *from, size_t n)
@@ -250,9 +335,9 @@ static void termio_to_termios(struct termio *tio, struct termios *tios)
 #define IOCTL(cmd, data, fflags, td) \
     bsd_ttydev_methods.d_ioctl(tp, cmd, data, fflags, td)
 
-int lwp_tty_ioctl_adapter(lwp_tty_t tp, int cmd, void *args, rt_thread_t td)
+int lwp_tty_ioctl_adapter(lwp_tty_t tp, int cmd, int oflags, void *args, rt_thread_t td)
 {
-    long fflags = 0;
+    long fflags = FFLAGS(oflags);
     struct termios tios;
     struct termio tio;
     int error;
@@ -432,7 +517,7 @@ int lwp_tty_ioctl_adapter(lwp_tty_t tp, int cmd, void *args, rt_thread_t td)
         case TIOCSWINSZ:
             error = IOCTL(cmd, (rt_caddr_t)args, fflags, td);
             break;
-#if 0
+#ifdef USING_BSD_IOCTL_EXT
         case TIOCMGET:
             args->cmd = TIOCMGET;
             error = (sys_ioctl(td, (struct ioctl_args *)args));

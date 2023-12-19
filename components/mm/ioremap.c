@@ -111,4 +111,3 @@ void rt_iounmap(volatile void *vaddr)
 {
     rt_aspace_unmap(&rt_kernel_space, (void *)vaddr);
 }
-

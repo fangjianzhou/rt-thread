@@ -393,6 +393,7 @@ int netdev_getnetdev(struct msg_buf *msg, int (*cb)(struct msg_buf *m_buf, struc
 {
     struct netdev *cur_nd_list = netdev_list;
     struct netdev *nd_node;
+    struct netdev nd;
     rt_base_t level;
     int index = 0;
     int nd_num = 0;
@@ -405,7 +406,8 @@ int netdev_getnetdev(struct msg_buf *msg, int (*cb)(struct msg_buf *m_buf, struc
     nd_num = rt_slist_len(&cur_nd_list->list) + 1;
     rt_spin_unlock_irqrestore(&_spinlock, level);
 
-    err = cb(msg, cur_nd_list, nd_num, index, ROUTE_IPV4_TRUE);
+    rt_memcpy(&nd, cur_nd_list, sizeof(struct netdev));
+    err = cb(msg, &nd, nd_num, index, ROUTE_IPV4_TRUE);
     if (err < 0)
         return err;
 
@@ -414,11 +416,16 @@ int netdev_getnetdev(struct msg_buf *msg, int (*cb)(struct msg_buf *m_buf, struc
     level = rt_spin_lock_irqsave(&_spinlock);
     rt_slist_for_each_entry(nd_node, &(cur_nd_list->list), list)
     {
-        err = cb(msg, nd_node, nd_num, index, ROUTE_IPV4_TRUE);
+        rt_memcpy(&nd, nd_node, sizeof(struct netdev));
+        rt_spin_unlock_irqrestore(&_spinlock, level);
+        err = cb(msg, &nd, nd_num, index, ROUTE_IPV4_TRUE);
         if (err < 0)
+        {
             return err;
+        }
 
         index ++;
+        level = rt_spin_lock_irqsave(&_spinlock);
     }
     rt_spin_unlock_irqrestore(&_spinlock, level);
 

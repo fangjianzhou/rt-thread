@@ -25,7 +25,6 @@
 #include <rthw.h>
 #include <board.h>
 
-#include <console.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -60,6 +59,7 @@
 #include <sys/stat.h>
 #include <sys/statfs.h> /* statfs() */
 #include <sys/timerfd.h>
+#include <sys/ioctl.h>
 #ifdef RT_USING_MUSLLIBC
 #include <sys/signalfd.h>
 #endif
@@ -91,7 +91,6 @@
     #define SYSCALL_USPACE(f)   SYSCALL_SIGN(sys_notimpl)
 #endif /* defined(RT_USING_DFS) && defined(ARCH_MM_MMU) */
 
-#include <tty.h>
 #include "lwp_ipc_internal.h"
 #include <sched.h>
 
@@ -1036,8 +1035,8 @@ sysret_t sys_getppid(void)
     process = lwp_self();
     if (process->parent == RT_NULL)
     {
-        LOG_E("This process %d has no parent process", lwp_to_pid(process));
-        return -1;
+        LOG_E("%s: process %d has no parent process", __func__, lwp_to_pid(process));
+        return 0;
     }
     else
     {
@@ -2141,28 +2140,6 @@ sysret_t _sys_fork(void)
     arch_set_thread_context(arch_fork_exit,
             (void *)((char *)thread->stack_addr + thread->stack_size),
             user_stack, &thread->sp);
-
-    /* new thread never reach there */
-    LWP_LOCK(lwp);
-    if (lwp->tty != RT_NULL)
-    {
-        int ret;
-        struct rt_lwp *old_lwp;
-
-        old_lwp = lwp->tty->foreground;
-        rt_mutex_take(&lwp->tty->lock, RT_WAITING_FOREVER);
-        ret = tty_push(&lwp->tty->head, old_lwp);
-        rt_mutex_release(&lwp->tty->lock);
-        if (ret < 0)
-        {
-            LOG_E("malloc fail!\n");
-            SET_ERRNO(ENOMEM);
-            goto fail;
-        }
-
-        lwp->tty->foreground = lwp;
-    }
-    LWP_UNLOCK(lwp);
 
     rt_thread_startup(thread);
     return lwp_to_pid(lwp);

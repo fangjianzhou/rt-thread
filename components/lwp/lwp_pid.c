@@ -31,7 +31,6 @@
 #include <rtdbg.h>
 
 #include "lwp_internal.h"
-#include "tty.h"
 
 #include <rthw.h>
 #include <rtthread.h>
@@ -647,38 +646,6 @@ void lwp_thread_exit(rt_thread_t thread, int status)
 #endif /* ARCH_MM_MMU */
 
     _thread_exit(lwp, thread);
-}
-
-static void _pop_tty(rt_lwp_t lwp)
-{
-    if (!lwp->background)
-    {
-        struct termios *old_stdin_termios = get_old_termios();
-        struct rt_lwp *old_lwp = NULL;
-
-        if (lwp->D_session == -1)
-        {
-            tcsetattr(1, 0, old_stdin_termios);
-        }
-        if (lwp->tty != RT_NULL)
-        {
-            rt_mutex_take(&lwp->tty->lock, RT_WAITING_FOREVER);
-            if (lwp->tty->foreground == lwp)
-            {
-                old_lwp = tty_pop(&lwp->tty->head, RT_NULL);
-                lwp->tty->foreground = old_lwp;
-            }
-            else
-            {
-                tty_pop(&lwp->tty->head, lwp);
-            }
-            rt_mutex_release(&lwp->tty->lock);
-
-            LWP_LOCK(lwp);
-            lwp->tty = RT_NULL;
-            LWP_UNLOCK(lwp);
-        }
-    }
 }
 
 /** @note the reference is not for synchronization, but for the release of resource. the synchronization is done through lwp & pid lock */
@@ -1656,8 +1623,6 @@ static void _resr_cleanup(struct rt_lwp *lwp)
         LWP_LOCK(lwp);
     }
     LWP_UNLOCK(lwp);
-
-    _pop_tty(lwp);
 
     /**
      * @brief Wakeup parent if it's waiting for this lwp, otherwise a signal

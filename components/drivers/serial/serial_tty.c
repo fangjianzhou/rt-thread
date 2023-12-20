@@ -216,6 +216,11 @@ rt_err_t rt_hw_serial_register_tty(struct rt_serial_device *serial)
     char *dev_name;
     struct serial_tty_context *softc;
 
+    if (serial->rx_notify.dev)
+    {
+        return -RT_EBUSY;
+    }
+
     softc = rt_malloc(sizeof(struct serial_tty_context));
     if (softc)
     {

@@ -152,14 +152,9 @@ struct lwp_tty
     struct rt_condvar t_bgwait;     /* (t) Background wait queue. */
     struct rt_condvar t_dcdwait;    /* (t) Carrier Detect wait queue. */
 
-#ifdef USING_BSD_POLL
-    /* Polling mechanisms. */
-    struct selinfo t_inpoll;  /* (t) Input poll queue. */
-    struct selinfo t_outpoll; /* (t) Output poll queue. */
-#else
     struct rt_wqueue t_inpoll;  /* (t) Input poll queue. */
     struct rt_wqueue t_outpoll; /* (t) Output poll queue. */
-#endif
+
 #ifdef USING_BSD_AIO
     struct sigio *t_sigio; /* (t) Asynchronous I/O. */
 #endif
@@ -196,9 +191,10 @@ struct lwp_tty
 #ifdef USING_BSD_CHAR_DEVICE
     struct cdev *t_dev; /* (c) Primary character device. */
 #endif                  /* USING_BSD_CHAR_DEVICE */
-
+#ifdef USING_BSD_SIGINFO
     size_t t_prbufsz; /* (t) SIGINFO buffer size. */
     char t_prbuf[];   /* (t) SIGINFO buffer. */
+#endif /* USING_BSD_SIGINFO */
 };
 typedef struct lwp_tty *lwp_tty_t;
 
@@ -291,6 +287,11 @@ void lwp_tty_signal_pgrp(struct lwp_tty *tp, int sig);
  * @return rt_device_t new device object if succeed, otherwise NULL
  */
 rt_err_t lwp_ptmx_init(rt_device_t ptmx_device, const char *root_path);
+
+/**
+ * @brief Register an alternative backend tty device as console
+ */
+rt_err_t lwp_console_register_backend(struct rt_device *bakdev, int prio);
 
 rt_inline int ttydevsw_open(struct lwp_tty *tp)
 {

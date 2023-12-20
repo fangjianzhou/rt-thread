@@ -642,6 +642,10 @@ static int ptsdrv_open(struct lwp_tty *tp)
 {
     struct pts_softc *psc = tty_softc(tp);
 
+    /* for ioctl(TIOCSPTLCK) */
+    if (psc->pts_flags & PTS_PTLOCKED)
+        return -EIO;
+
     psc->pts_flags &= ~PTS_FINISHED;
 
     return 0;
@@ -745,14 +749,14 @@ int pts_alloc(int fflags, struct rt_thread *td, struct dfs_file *ptm_file)
     if (error != 0)
     {
         LWP_UNLOCK(p);
-        return (EAGAIN);
+        return -EAGAIN;
     }
     ok = chgptscnt(cred->cr_ruidinfo, 1, lim_cur(td, RLIMIT_NPTS));
     if (!ok)
     {
         racct_sub(p, RACCT_NPTS, 1);
         LWP_UNLOCK(p);
-        return (EAGAIN);
+        return -EAGAIN;
     }
     LWP_UNLOCK(p);
 #endif

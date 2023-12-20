@@ -317,7 +317,7 @@ rt_err_t lwp_ptmx_init(rt_device_t ptmx_device, const char *root_path)
 }
 
 /* system level ptmx */
-static struct lwp_tty sysptmx;
+static struct rt_device sysptmx;
 
 static struct dfs_file_ops sysptmx_file_ops;
 
@@ -334,12 +334,16 @@ static rt_err_t sysptmx_readlink(struct rt_device *dev, char *buf, int len)
 static int _sys_ptmx_init(void)
 {
     rt_err_t rc;
+    rt_device_t sysptmx_rtdev = &sysptmx;
+
     /* setup system level device */
-    rc = rt_device_register(&sysptmx.parent, "ptmx", RT_DEVICE_FLAG_DYNAMIC);
+    sysptmx_rtdev->type = RT_Device_Class_Char;
+    sysptmx_rtdev->ops = RT_NULL;
+    rc = rt_device_register(sysptmx_rtdev, "ptmx", RT_DEVICE_FLAG_DYNAMIC);
     if (rc == RT_EOK)
     {
-        sysptmx.parent.readlink = &sysptmx_readlink;
-        sysptmx.parent.fops = &sysptmx_file_ops;
+        sysptmx_rtdev->readlink = &sysptmx_readlink;
+        sysptmx_rtdev->fops = &sysptmx_file_ops;
     }
     return rc;
 }

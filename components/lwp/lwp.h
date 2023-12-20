@@ -51,10 +51,6 @@
 #include <locale.h>
 #endif /* RT_USING_MUSLLIBC */
 
-#ifdef  RT_USING_TTY
-struct tty_struct;
-#endif /* RT_USING_TTY */
-
 #ifdef __cplusplus
 extern "C" {
 #endif

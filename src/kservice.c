@@ -44,7 +44,6 @@
 #ifdef RT_USING_SMART
 #include <lwp.h>
 #include <lwp_user_mm.h>
-#include <console.h>
 #endif
 
 /* use precision */
@@ -1437,27 +1436,6 @@ RTM_EXPORT(rt_console_get_device);
  */
 rt_device_t rt_console_set_device(const char *name)
 {
-#ifdef RT_USING_SMART
-    rt_device_t new_iodev = RT_NULL, old_iodev = RT_NULL;
-
-    /* find new console device */
-    new_iodev = rt_device_find(name);
-    if (new_iodev != RT_NULL)
-    {
-        if (_console_device != RT_NULL)
-        {
-            old_iodev = console_set_iodev(new_iodev);
-        }
-        else
-        {
-            console_register("console", new_iodev);
-            _console_device = rt_device_find("console");
-            rt_device_open(_console_device, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_STREAM);
-        }
-    }
-
-    return old_iodev;
-#else
     rt_device_t new_device, old_device;
 
     /* save old device */
@@ -1483,7 +1461,6 @@ rt_device_t rt_console_set_device(const char *name)
     }
 
     return old_device;
-#endif
 }
 RTM_EXPORT(rt_console_set_device);
 #endif /* RT_USING_DEVICE */
@@ -1493,6 +1470,26 @@ rt_weak void rt_hw_console_output(const char *str)
     /* empty console output */
 }
 RTM_EXPORT(rt_hw_console_output);
+
+static void _puts(const char *str, long len)
+{
+#ifdef RT_USING_DEVICE
+    if (_console_device == RT_NULL)
+    {
+        rt_hw_console_output(str);
+    }
+    else
+    {
+    #ifdef RT_USING_POSIX_STDIO
+        rt_device_write(_console_device, 0, str, len);
+    #else
+        rt_device_write(_console_device, 0, str, len);
+    #endif
+    }
+#else
+    rt_hw_console_output(str);
+#endif /* RT_USING_DEVICE */
+}
 
 /**
  * @brief This function will put string to the console.
@@ -1506,18 +1503,7 @@ void rt_kputs(const char *str)
         return;
     }
 
-#ifdef RT_USING_DEVICE
-    if (_console_device == RT_NULL)
-    {
-        rt_hw_console_output(str);
-    }
-    else
-    {
-        rt_device_write(_console_device, 0, str, rt_strlen(str));
-    }
-#else
-    rt_hw_console_output(str);
-#endif /* RT_USING_DEVICE */
+    _puts(str, rt_strlen(str));
 }
 
 /**
@@ -1545,18 +1531,7 @@ rt_weak int rt_kprintf(const char *fmt, ...)
         length = RT_CONSOLEBUF_SIZE - 1;
     }
 
-#ifdef RT_USING_DEVICE
-    if (_console_device == RT_NULL)
-    {
-        rt_hw_console_output(rt_log_buf);
-    }
-    else
-    {
-        rt_device_write(_console_device, 0, rt_log_buf, length);
-    }
-#else
-    rt_hw_console_output(rt_log_buf);
-#endif /* RT_USING_DEVICE */
+    _puts(rt_log_buf, length);
     va_end(args);
 
     return length;

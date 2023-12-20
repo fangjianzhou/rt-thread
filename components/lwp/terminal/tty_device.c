@@ -294,6 +294,7 @@ static struct dfs_file_ops tty_file_ops = {
 
 rt_inline void device_setup(lwp_tty_t terminal)
 {
+    terminal->parent.type = RT_Device_Class_Char;
 #ifdef RT_USING_DEVICE_OPS
     terminal->parent.ops = &tty_dev_ops;
 #else
@@ -359,13 +360,20 @@ lwp_tty_t lwp_tty_create_ext(lwp_ttydevsw_t handle, void *softc,
 {
     lwp_tty_t tp;
 
-    tp = rt_calloc(1, sizeof(struct lwp_tty) + LWP_TTY_PRBUF_SIZE);
+    tp = rt_calloc(1, sizeof(struct lwp_tty)
+    #ifdef USING_BSD_SIGINFO
+            + LWP_TTY_PRBUF_SIZE
+    #endif
+            );
+
     if (!tp)
         return tp;
 
     bsd_devsw_init(handle);
 
+#ifdef USING_BSD_SIGINFO
     tp->t_prbufsz = LWP_TTY_PRBUF_SIZE;
+#endif
     tp->t_devsw = handle;
     tp->t_devswsoftc = softc;
     tp->t_flags = handle->tsw_flags;

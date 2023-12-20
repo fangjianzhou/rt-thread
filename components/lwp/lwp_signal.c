@@ -555,7 +555,10 @@ static void _notify_parent_and_leader(rt_lwp_t child_lwp, rt_thread_t child_thr,
 {
     int si_code;
     lwp_siginfo_ext_t ext;
-    rt_lwp_t prarent_lwp = child_lwp->parent;
+    rt_lwp_t parent_lwp = child_lwp->parent;
+
+    if (!parent_lwp)
+        return ;
 
     /* prepare the event data for parent to query */
     if (is_stop)
@@ -570,9 +573,9 @@ static void _notify_parent_and_leader(rt_lwp_t child_lwp, rt_thread_t child_thr,
     }
 
     /* wakeup waiter on waitpid(2) */
-    lwp_waitpid_kick(prarent_lwp, child_lwp);
+    lwp_waitpid_kick(parent_lwp, child_lwp);
 
-    if (_need_notify_status_changed(prarent_lwp, trig_signo))
+    if (_need_notify_status_changed(parent_lwp, trig_signo))
     {
         ext = rt_malloc(sizeof(struct lwp_siginfo_ext));
         if (ext)
@@ -585,7 +588,7 @@ static void _notify_parent_and_leader(rt_lwp_t child_lwp, rt_thread_t child_thr,
         }
 
         /* generate SIGCHLD for parent */
-        lwp_signal_kill(prarent_lwp, SIGCHLD, si_code, ext);
+        lwp_signal_kill(parent_lwp, SIGCHLD, si_code, ext);
     }
 }
 

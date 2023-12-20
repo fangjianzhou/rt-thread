@@ -505,7 +505,7 @@ int dfs_file_open(struct dfs_file *file, const char *path, int oflags, mode_t mo
 
                         if (ret < 0)
                         {
-                            LOG_E("open %s failed in file system: %s", path, dentry->mnt->fs_ops->name);
+                            LOG_I("open %s failed in file system: %s", path, dentry->mnt->fs_ops->name);
                             DLOG(msg, mnt->fs_ops->name, "dfs_file", DLOG_MSG_RET, "open failed.");
                             dfs_file_unref(file);
                         }

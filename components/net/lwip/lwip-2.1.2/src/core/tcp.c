@@ -2186,7 +2186,10 @@ tcp_record_pcb_last_node(struct tcp_pcb **pcblist)
   struct tcp_pcb *pcbs = *pcblist;
 
   if (pcbs == NULL)
+  {
+    tcp_sentinel_node = NULL;
     return ;
+  }
 
   while(pcbs->next != NULL)
   {

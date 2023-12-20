@@ -1311,6 +1311,10 @@ udp_remove(struct udp_pcb *pcb)
         udp_sentinel_node = udp_pcbs;
       }
     }
+    else
+    {
+      udp_sentinel_node = NULL;
+    }
   }
 
   memp_free(MEMP_UDP_PCB, pcb);

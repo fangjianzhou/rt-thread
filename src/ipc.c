@@ -131,15 +131,24 @@ rt_inline rt_err_t _ipc_object_init(struct rt_ipc_object *ipc)
  *           rt_mb_recv(),   rt_mq_recv(),     rt_mq_send_wait()
  */
 rt_inline rt_err_t _ipc_list_suspend(rt_list_t        *list,
-                                       struct rt_thread *thread,
-                                       rt_uint8_t        flag,
-                                       int suspend_flag)
+                                     struct rt_thread *thread,
+                                     rt_uint8_t        flag,
+                                     int suspend_flag)
 {
     rt_base_t level_local;
+    rt_thread_t self_thread = rt_thread_self();
+    rt_err_t ret;
+
     level_local = rt_hw_local_irq_disable();
     if ((thread->stat & RT_THREAD_SUSPEND_MASK) != RT_THREAD_SUSPEND_MASK)
     {
-        rt_err_t ret = rt_thread_suspend_with_flag(thread, suspend_flag);
+        if (self_thread != thread)
+        {
+            rt_hw_local_irq_enable(level_local);
+            return ret = -RT_EINVAL;
+        }
+
+        ret = rt_thread_suspend_with_flag(thread, suspend_flag);
 
         /* suspend thread */
         if (ret != RT_EOK)

@@ -143,7 +143,10 @@ rt_inline rt_err_t _ipc_list_suspend(rt_list_t        *list,
     if ((thread->stat & RT_THREAD_SUSPEND_MASK) != RT_THREAD_SUSPEND_MASK)
     {
         if (self_thread != thread)
+        {
+            rt_hw_local_irq_enable(level_local);
             return ret = -RT_EINVAL;
+        }
 
         ret = rt_thread_suspend_with_flag(thread, suspend_flag);
 

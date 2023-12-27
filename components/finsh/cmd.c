@@ -883,7 +883,7 @@ long list_device(void)
 
     maxlen = RT_NAME_MAX;
 
-    rt_kprintf("%-*.*s         type         ref count\n", maxlen, maxlen, item_title);
+    rt_kprintf("%-*.*s         type         rt_ref count\n", maxlen, maxlen, item_title);
     object_split(maxlen);
     rt_kprintf(" -------------------- ----------\n");
     do

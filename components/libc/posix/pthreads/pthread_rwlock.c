@@ -63,7 +63,7 @@ int pthread_rwlock_init(pthread_rwlock_t           *rwlock,
 
     rwlock->rw_nwaitwriters = 0;
     rwlock->rw_nwaitreaders = 0;
-    rwlock->rw_refcount = 0;
+    rwlock->rw_rt_refcount = 0;
 
     return 0;
 }
@@ -81,7 +81,7 @@ int pthread_rwlock_destroy (pthread_rwlock_t *rwlock)
     if ( (result = pthread_mutex_lock(&rwlock->rw_mutex)) != 0)
         return(result);
 
-    if (rwlock->rw_refcount != 0 ||
+    if (rwlock->rw_rt_refcount != 0 ||
         rwlock->rw_nwaitreaders != 0 ||
         rwlock->rw_nwaitwriters != 0)
     {
@@ -134,8 +134,8 @@ int pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)
     if ((result = pthread_mutex_lock(&rwlock->rw_mutex)) != 0)
         return(result);
 
-    /* give preference to waiting writers */
-    while (rwlock->rw_refcount < 0 || rwlock->rw_nwaitwriters > 0)
+    /* give prt_reference to waiting writers */
+    while (rwlock->rw_rt_refcount < 0 || rwlock->rw_nwaitwriters > 0)
     {
         rwlock->rw_nwaitreaders++;
         /* rw_mutex will be released when waiting for rw_condreaders */
@@ -148,7 +148,7 @@ int pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)
 
     /* another reader has a read lock */
     if (result == 0)
-        rwlock->rw_refcount++;
+        rwlock->rw_rt_refcount++;
 
     pthread_mutex_unlock(&rwlock->rw_mutex);
 
@@ -168,10 +168,10 @@ int pthread_rwlock_tryrdlock(pthread_rwlock_t *rwlock)
     if ((result = pthread_mutex_lock(&rwlock->rw_mutex)) != 0)
         return(result);
 
-    if (rwlock->rw_refcount < 0 || rwlock->rw_nwaitwriters > 0)
+    if (rwlock->rw_rt_refcount < 0 || rwlock->rw_nwaitwriters > 0)
         result = EBUSY;                 /* held by a writer or waiting writers */
     else
-        rwlock->rw_refcount++;          /* increment count of reader locks */
+        rwlock->rw_rt_refcount++;          /* increment count of reader locks */
 
     pthread_mutex_unlock(&rwlock->rw_mutex);
 
@@ -192,8 +192,8 @@ int pthread_rwlock_timedrdlock(pthread_rwlock_t      *rwlock,
     if ( (result = pthread_mutex_lock(&rwlock->rw_mutex)) != 0)
         return(result);
 
-    /* give preference to waiting writers */
-    while (rwlock->rw_refcount < 0 || rwlock->rw_nwaitwriters > 0)
+    /* give prt_reference to waiting writers */
+    while (rwlock->rw_rt_refcount < 0 || rwlock->rw_nwaitwriters > 0)
     {
         rwlock->rw_nwaitreaders++;
         /* rw_mutex will be released when waiting for rw_condreaders */
@@ -206,7 +206,7 @@ int pthread_rwlock_timedrdlock(pthread_rwlock_t      *rwlock,
 
     /* another reader has a read lock */
     if (result == 0)
-        rwlock->rw_refcount++;
+        rwlock->rw_rt_refcount++;
 
     pthread_mutex_unlock(&rwlock->rw_mutex);
 
@@ -227,7 +227,7 @@ int pthread_rwlock_timedwrlock(pthread_rwlock_t      *rwlock,
     if ((result = pthread_mutex_lock(&rwlock->rw_mutex)) != 0)
         return(result);
 
-    while (rwlock->rw_refcount != 0)
+    while (rwlock->rw_rt_refcount != 0)
     {
         rwlock->rw_nwaitwriters++;
         /* rw_mutex will be released when waiting for rw_condwriters */
@@ -240,7 +240,7 @@ int pthread_rwlock_timedwrlock(pthread_rwlock_t      *rwlock,
     }
 
     if (result == 0)
-        rwlock->rw_refcount = -1;
+        rwlock->rw_rt_refcount = -1;
 
     pthread_mutex_unlock(&rwlock->rw_mutex);
 
@@ -260,10 +260,10 @@ int pthread_rwlock_trywrlock(pthread_rwlock_t *rwlock)
     if ((result = pthread_mutex_lock(&rwlock->rw_mutex)) != 0)
         return(result);
 
-    if (rwlock->rw_refcount != 0)
+    if (rwlock->rw_rt_refcount != 0)
         result = EBUSY;                 /* held by either writer or reader(s) */
     else
-        rwlock->rw_refcount = -1;       /* available, indicate a writer has it */
+        rwlock->rw_rt_refcount = -1;       /* available, indicate a writer has it */
 
     pthread_mutex_unlock(&rwlock->rw_mutex);
 
@@ -283,15 +283,15 @@ int pthread_rwlock_unlock(pthread_rwlock_t *rwlock)
     if ( (result = pthread_mutex_lock(&rwlock->rw_mutex)) != 0)
         return(result);
 
-    if (rwlock->rw_refcount > 0)
-        rwlock->rw_refcount--;              /* releasing a reader */
-    else if (rwlock->rw_refcount == -1)
-        rwlock->rw_refcount = 0;            /* releasing a writer */
+    if (rwlock->rw_rt_refcount > 0)
+        rwlock->rw_rt_refcount--;              /* releasing a reader */
+    else if (rwlock->rw_rt_refcount == -1)
+        rwlock->rw_rt_refcount = 0;            /* releasing a writer */
 
-    /* give preference to waiting writers over waiting readers */
+    /* give prt_reference to waiting writers over waiting readers */
     if (rwlock->rw_nwaitwriters > 0)
     {
-        if (rwlock->rw_refcount == 0)
+        if (rwlock->rw_rt_refcount == 0)
             result = pthread_cond_signal(&rwlock->rw_condwriters);
     }
     else if (rwlock->rw_nwaitreaders > 0)
@@ -317,7 +317,7 @@ int pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
     if ((result = pthread_mutex_lock(&rwlock->rw_mutex)) != 0)
         return(result);
 
-    while (rwlock->rw_refcount != 0)
+    while (rwlock->rw_rt_refcount != 0)
     {
         rwlock->rw_nwaitwriters++;
         /* rw_mutex will be released when waiting for rw_condwriters */
@@ -330,7 +330,7 @@ int pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
     }
 
     if (result == 0)
-        rwlock->rw_refcount = -1;
+        rwlock->rw_rt_refcount = -1;
 
     pthread_mutex_unlock(&rwlock->rw_mutex);
 

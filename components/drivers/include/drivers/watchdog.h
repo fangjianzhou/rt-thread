@@ -16,7 +16,7 @@
 #define RT_DEVICE_CTRL_WDT_GET_TIMEOUT    (RT_DEVICE_CTRL_BASE(WDT) + 1) /* get timeout(in seconds) */
 #define RT_DEVICE_CTRL_WDT_SET_TIMEOUT    (RT_DEVICE_CTRL_BASE(WDT) + 2) /* set timeout(in seconds) */
 #define RT_DEVICE_CTRL_WDT_GET_TIMELEFT   (RT_DEVICE_CTRL_BASE(WDT) + 3) /* get the left time before reboot(in seconds) */
-#define RT_DEVICE_CTRL_WDT_KEEPALIVE      (RT_DEVICE_CTRL_BASE(WDT) + 4) /* refresh watchdog */
+#define RT_DEVICE_CTRL_WDT_KEEPALIVE      (RT_DEVICE_CTRL_BASE(WDT) + 4) /* rt_refresh watchdog */
 #define RT_DEVICE_CTRL_WDT_START          (RT_DEVICE_CTRL_BASE(WDT) + 5) /* start watchdog */
 #define RT_DEVICE_CTRL_WDT_STOP           (RT_DEVICE_CTRL_BASE(WDT) + 6) /* stop watchdog */
 

@@ -238,8 +238,8 @@ RTM_EXPORT(mq_close);
  *
  * @note    The mq_unlink() function shall remove the message queue named by the string name.
  *          If one or more processes have the message queue open when mq_unlink() is called,
- *          destruction of the message queue shall be postponed until all references to the message queue have been closed.
- *          However, the mq_unlink() call need not block until all references have been closed; it may return immediately.
+ *          destruction of the message queue shall be postponed until all rt_references to the message queue have been closed.
+ *          However, the mq_unlink() call need not block until all rt_references have been closed; it may return immediately.
  *
  *          After a successful call to mq_unlink(), reuse of the name shall subsequently cause mq_open() to behave as if
  *          no message queue of this name exists (that is, mq_open() will fail if O_CREAT is not set,
@@ -257,7 +257,7 @@ RTM_EXPORT(mq_close);
  *              [EACCES]
  *              Permission is denied to unlink the named message queue.
  *              [EINTR]
- *              The call to mq_unlink() blocked waiting for all references to the named message queue to be closed and a signal interrupted the call.
+ *              The call to mq_unlink() blocked waiting for all rt_references to the named message queue to be closed and a signal interrupted the call.
  *              [ENOENT]
  *              The named message queue does not exist.
  *           The mq_unlink() function may fail if:

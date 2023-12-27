@@ -127,10 +127,7 @@ struct rt_sdio_function {
 
 #define SDIO_MAX_FUNCTIONS      7
 
-struct rt_mmc_ext_csd
-{
-    rt_uint32_t cache_size;
-};
+
 
 struct rt_mmcsd_card {
     struct rt_mmcsd_host *host;
@@ -167,8 +164,6 @@ struct rt_mmcsd_card {
     struct rt_sdio_cis     cis;  /* common tuple info */
     struct rt_sdio_function *sdio_function[SDIO_MAX_FUNCTIONS + 1]; /* SDIO functions (devices) */
     rt_list_t blk_devices;  /* for block device list */
-
-    struct rt_mmc_ext_csd ext_csd;
 };
 
 #ifdef __cplusplus

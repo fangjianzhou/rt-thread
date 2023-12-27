@@ -86,7 +86,7 @@ enum
     AUDIO_STREAM_LAST = AUDIO_STREAM_RECORD,
 };
 
-/* the preferred number and size of audio pipeline buffer for the audio device */
+/* the prt_referred number and size of audio pipeline buffer for the audio device */
 struct rt_audio_buf_info
 {
     rt_uint8_t *buffer;

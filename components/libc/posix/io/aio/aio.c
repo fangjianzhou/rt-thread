@@ -59,7 +59,7 @@ int aio_cancel(int fd, struct aiocb *cb)
 
 /**
  * The aio_error() function shall return the error status associated with the
- * aiocb structure referenced by the aiocbp argument. The error status for an
+ * aiocb structure rt_referenced by the aiocbp argument. The error status for an
  * asynchronous I/O operation is the errno value that would be set by the corresponding
  * read(), write(),
  */
@@ -77,7 +77,7 @@ int aio_error (const struct aiocb *cb)
  * The aio_fsync() function shall asynchronously perform a file synchronization
  * operation, as specified by the op argument, for I/O operations associated with
  * the file indicated by the file descriptor aio_fildes member of the aiocb
- * structure referenced by the aiocbp argument and queued at the time of the
+ * structure rt_referenced by the aiocbp argument and queued at the time of the
  * call to aio_fsync(). The function call shall return when the synchronization
  * request has been initiated or queued to the file or device (even when the data
  * cannot be synchronized immediately).
@@ -97,18 +97,18 @@ int aio_error (const struct aiocb *cb)
  * completion state. The completion of subsequent I/O on the file descriptor is
  * not guaranteed to be completed in a synchronized fashion.
  *
- * The aiocbp argument refers to an asynchronous I/O control block. The aiocbp
+ * The aiocbp argument rt_refers to an asynchronous I/O control block. The aiocbp
  * value may be used as an argument to aio_error() and aio_return() in order to
  * determine the error status and return status, respectively, of the asynchronous
  * operation while it is proceeding. When the request is queued, the error status
  * for the operation is [EINPROGRESS]. When all data has been successfully transferred,
- * the error status shall be reset to reflect the success or failure of the operation.
+ * the error status shall be reset to rt_reflect the success or failure of the operation.
  * If the operation does not complete successfully, the error status for the
  * operation shall be set to indicate the error. The aio_sigevent member determines
  * the asynchronous notification to occur as specified in Signal Generation and
  * Delivery when all operations have achieved synchronized I/O completion. All
- * other members of the structure referenced by aiocbp are ignored. If the control
- * block referenced by aiocbp becomes an illegal address prior to asynchronous
+ * other members of the structure rt_referenced by aiocbp are ignored. If the control
+ * block rt_referenced by aiocbp becomes an illegal address prior to asynchronous
  * I/O completion, then the behavior is undefined.
  *
  * If the aio_fsync() function fails or aiocbp indicates an error condition,
@@ -240,14 +240,14 @@ int aio_read(struct aiocb *cb)
 
 /**
  * The aio_return() function shall return the return status associated with the
- * aiocb structure referenced by the aiocbp argument. The return status for an
+ * aiocb structure rt_referenced by the aiocbp argument. The return status for an
  * asynchronous I/O operation is the value that would be returned by the corresponding
  * read(), write(), or fsync() function call. If the error status for the operation
  * is equal to [EINPROGRESS], then the return status for the operation is undefined.
  * The aio_return() function may be called exactly once to retrieve the return
  * status of a given asynchronous operation; thereafter, if the same aiocb structure
  * is used in a call to aio_return() or aio_error(), an error may be returned.
- * When the aiocb structure referred to by aiocbp is used to submit another asynchronous
+ * When the aiocb structure rt_referred to by aiocbp is used to submit another asynchronous
  * operation, then aio_return() may be successfully used to retrieve the return
  * status of that operation.
  */
@@ -266,7 +266,7 @@ ssize_t  aio_return(struct aiocb *cb)
 
 /**
  * The aio_suspend() function shall suspend the calling thread until at least
- * one of the asynchronous I/O operations referenced by the list argument has
+ * one of the asynchronous I/O operations rt_referenced by the list argument has
  * completed, until a signal interrupts the function, or, if timeout is not NULL,
  * until the time interval specified by timeout has passed. If any of the aiocb
  * structures in the list correspond to completed asynchronous I/O operations
@@ -277,11 +277,11 @@ ssize_t  aio_return(struct aiocb *cb)
  * array. Each aiocb structure pointed to has been used in initiating an asynchronous
  * I/O request via aio_read(), aio_write(), or lio_listio(). This array may
  * contain null pointers, which are ignored. If this array contains pointers
- * that refer to aiocb structures that have not been used in submitting asynchronous
+ * that rt_refer to aiocb structures that have not been used in submitting asynchronous
  * I/O, the effect is undefined.
  *
  * If the time interval indicated in the timespec structure pointed to by timeout
- * passes before any of the I/O operations referenced by list are completed, then
+ * passes before any of the I/O operations rt_referenced by list are completed, then
  * aio_suspend() shall return with an error.
  */
 int aio_suspend(const struct aiocb *const list[], int nent,

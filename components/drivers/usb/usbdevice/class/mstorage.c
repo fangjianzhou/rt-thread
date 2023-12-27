@@ -12,8 +12,6 @@
  */
 
 #include <rtthread.h>
-#include <rtdevice.h>
-
 #include "drivers/usb_device.h"
 #include "mstorage.h"
 
@@ -22,10 +20,6 @@
 #endif
 #ifdef RT_USB_DEVICE_MSTORAGE
 #define MSTRORAGE_INTF_STR_INDEX 11
-
-#define DBG_TAG           "usbdevice.mstorage"
-#define DBG_LVL           DBG_INFO
-#include <rtdbg.h>
 
 enum STAT
 {
@@ -208,7 +202,7 @@ static void _send_status(ufunction_t func)
 
     RT_ASSERT(func != RT_NULL);
 
-    LOG_D("_send_status");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_send_status\n"));
 
     data = (struct mstorage*)func->user_data;
     data->ep_in->request.buffer = (rt_uint8_t*)&data->csw_response;
@@ -225,7 +219,7 @@ static rt_ssize_t _test_unit_ready(ufunction_t func, ustorage_cbw_t cbw)
     RT_ASSERT(func != RT_NULL);
     RT_ASSERT(func->device != RT_NULL);
 
-    LOG_D("_test_unit_ready");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_test_unit_ready\n"));
 
     data = (struct mstorage*)func->user_data;
     data->csw_response.status = 0;
@@ -240,7 +234,7 @@ static rt_ssize_t _allow_removal(ufunction_t func, ustorage_cbw_t cbw)
     RT_ASSERT(func != RT_NULL);
     RT_ASSERT(func->device != RT_NULL);
 
-    LOG_D("_allow_removal");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_allow_removal\n"));
 
     data = (struct mstorage*)func->user_data;
     data->csw_response.status = 0;
@@ -266,7 +260,7 @@ static rt_ssize_t _inquiry_cmd(ufunction_t func, ustorage_cbw_t cbw)
     RT_ASSERT(func->device != RT_NULL);
     RT_ASSERT(cbw != RT_NULL);
 
-    LOG_D("_inquiry_cmd");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_inquiry_cmd\n"));
 
     data = (struct mstorage*)func->user_data;
     buf = data->ep_in->buffer;
@@ -305,7 +299,7 @@ static rt_ssize_t _request_sense(ufunction_t func, ustorage_cbw_t cbw)
     RT_ASSERT(func->device != RT_NULL);
     RT_ASSERT(cbw != RT_NULL);
 
-    LOG_D("_request_sense");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_request_sense\n"));
 
     data = (struct mstorage*)func->user_data;
     buf = (struct request_sense_data *)data->ep_in->buffer;
@@ -348,7 +342,7 @@ static rt_ssize_t _mode_sense_6(ufunction_t func, ustorage_cbw_t cbw)
     RT_ASSERT(func->device != RT_NULL);
     RT_ASSERT(cbw != RT_NULL);
 
-    LOG_D("_mode_sense_6");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_mode_sense_6\n"));
 
     data = (struct mstorage*)func->user_data;
     buf = data->ep_in->buffer;
@@ -385,7 +379,7 @@ static rt_ssize_t _read_capacities(ufunction_t func, ustorage_cbw_t cbw)
     RT_ASSERT(func->device != RT_NULL);
     RT_ASSERT(cbw != RT_NULL);
 
-    LOG_D("_read_capacities");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_read_capacities\n"));
 
     data = (struct mstorage*)func->user_data;
     buf = data->ep_in->buffer;
@@ -431,7 +425,7 @@ static rt_ssize_t _read_capacity(ufunction_t func, ustorage_cbw_t cbw)
     RT_ASSERT(func->device != RT_NULL);
     RT_ASSERT(cbw != RT_NULL);
 
-    LOG_D("_read_capacity");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_read_capacity\n"));
 
     data = (struct mstorage*)func->user_data;
     buf = data->ep_in->buffer;
@@ -521,8 +515,8 @@ static rt_ssize_t _write_10(ufunction_t func, ustorage_cbw_t cbw)
     data->csw_response.data_reside = cbw->xfer_len;
     data->size = data->count * data->geometry.bytes_per_sector;
 
-    LOG_D("_write_10 count 0x%x block 0x%x 0x%x",
-                                data->count, data->block, data->geometry.sector_count);
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_write_10 count 0x%x block 0x%x 0x%x\n",
+                                data->count, data->block, data->geometry.sector_count));
 
     data->csw_response.data_reside = data->cb_data_size;
 
@@ -549,7 +543,7 @@ static rt_ssize_t _verify_10(ufunction_t func, ustorage_cbw_t cbw)
     RT_ASSERT(func != RT_NULL);
     RT_ASSERT(func->device != RT_NULL);
 
-    LOG_D("_verify_10");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_verify_10\n"));
 
     data = (struct mstorage*)func->user_data;
     data->csw_response.status = 0;
@@ -565,7 +559,7 @@ static rt_ssize_t _start_stop(ufunction_t func,
     RT_ASSERT(func != RT_NULL);
     RT_ASSERT(func->device != RT_NULL);
 
-    LOG_D("_start_stop");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_start_stop\n"));
 
     data = (struct mstorage*)func->user_data;
     data->csw_response.status = 0;
@@ -580,7 +574,7 @@ static rt_err_t _ep_in_handler(ufunction_t func, rt_size_t size)
     RT_ASSERT(func != RT_NULL);
     RT_ASSERT(func->device != RT_NULL);
 
-    LOG_D("_ep_in_handler");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_ep_in_handler\n"));
 
     data = (struct mstorage*)func->user_data;
 
@@ -594,7 +588,7 @@ static rt_err_t _ep_in_handler(ufunction_t func, rt_size_t size)
         }
         else
         {
-            LOG_D("return to cbw status");
+            RT_DEBUG_LOG(RT_DEBUG_USB, ("return to cbw status\n"));
             data->ep_out->request.buffer = data->ep_out->buffer;
             data->ep_out->request.size = SIZEOF_CBW;
             data->ep_out->request.req_type = UIO_REQUEST_READ_FULL;
@@ -612,8 +606,8 @@ static rt_err_t _ep_in_handler(ufunction_t func, rt_size_t size)
             data->csw_response.data_reside -= data->ep_in->request.size;
             if(data->csw_response.data_reside != 0)
             {
-                LOG_D("data_reside %d, request %d",
-                    data->csw_response.data_reside, data->ep_in->request.size);
+                RT_DEBUG_LOG(RT_DEBUG_USB, ("data_reside %d, request %d\n",
+                    data->csw_response.data_reside, data->ep_in->request.size));
                 if(data->processing->dir == DIR_OUT)
                 {
                     rt_usbd_ep_set_stall(func->device, data->ep_out);
@@ -663,13 +657,13 @@ static void cbw_dump(struct ustorage_cbw* cbw)
 {
     RT_ASSERT(cbw != RT_NULL);
 
-    LOG_D("signature 0x%x", cbw->signature);
-    LOG_D("tag 0x%x", cbw->tag);
-    LOG_D("xfer_len 0x%x", cbw->xfer_len);
-    LOG_D("dflags 0x%x", cbw->dflags);
-    LOG_D("lun 0x%x", cbw->lun);
-    LOG_D("cb_len 0x%x", cbw->cb_len);
-    LOG_D("cb[0] 0x%x", cbw->cb[0]);
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("signature 0x%x\n", cbw->signature));
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("tag 0x%x\n", cbw->tag));
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("xfer_len 0x%x\n", cbw->xfer_len));
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("dflags 0x%x\n", cbw->dflags));
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("lun 0x%x\n", cbw->lun));
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("cb_len 0x%x\n", cbw->cb_len));
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("cb[0] 0x%x\n", cbw->cb[0]));
 }
 #endif
 
@@ -833,7 +827,7 @@ static rt_err_t _ep_out_handler(ufunction_t func, rt_size_t size)
     RT_ASSERT(func != RT_NULL);
     RT_ASSERT(func->device != RT_NULL);
 
-    LOG_D("_ep_out_handler %d", size);
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("_ep_out_handler %d\n", size));
 
     data = (struct mstorage*)func->user_data;
     cbw = (struct ustorage_cbw*)data->ep_out->buffer;
@@ -850,7 +844,7 @@ static rt_err_t _ep_out_handler(ufunction_t func, rt_size_t size)
         data->csw_response.data_reside = cbw->xfer_len;
         data->csw_response.status = 0;
 
-        LOG_D("ep_out reside %d", data->csw_response.data_reside);
+        RT_DEBUG_LOG(RT_DEBUG_USB, ("ep_out reside %d\n", data->csw_response.data_reside));
 
         cmd = _find_cbw_command(cbw->cb[0]);
         if(cmd == RT_NULL)
@@ -875,8 +869,8 @@ static rt_err_t _ep_out_handler(ufunction_t func, rt_size_t size)
     }
     else if(data->status == STAT_RECEIVE)
     {
-        LOG_D("write size %d block 0x%x oount 0x%x",
-                                    size, data->block, data->size);
+        RT_DEBUG_LOG(RT_DEBUG_USB, ("\nwrite size %d block 0x%x oount 0x%x\n",
+                                    size, data->block, data->size));
 
         data->size -= size;
         data->csw_response.data_reside -= size;
@@ -934,13 +928,13 @@ static rt_err_t _interface_handler(ufunction_t func, ureq_t setup)
     RT_ASSERT(func->device != RT_NULL);
     RT_ASSERT(setup != RT_NULL);
 
-    LOG_D("mstorage_interface_handler");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("mstorage_interface_handler\n"));
 
     switch(setup->bRequest)
     {
     case USBREQ_GET_MAX_LUN:
 
-        LOG_D("USBREQ_GET_MAX_LUN");
+        RT_DEBUG_LOG(RT_DEBUG_USB, ("USBREQ_GET_MAX_LUN\n"));
 
         if(setup->wValue || setup->wLength != 1)
         {
@@ -953,7 +947,7 @@ static rt_err_t _interface_handler(ufunction_t func, ureq_t setup)
         break;
     case USBREQ_MASS_STORAGE_RESET:
 
-        LOG_D("USBREQ_MASS_STORAGE_RESET");
+        RT_DEBUG_LOG(RT_DEBUG_USB, ("USBREQ_MASS_STORAGE_RESET\n"));
 
         if(setup->wValue || setup->wLength != 0)
         {
@@ -983,7 +977,7 @@ static rt_err_t _function_enable(ufunction_t func)
 {
     struct mstorage *data;
     RT_ASSERT(func != RT_NULL);
-    LOG_D("Mass storage function enabled");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("Mass storage function enabled\n"));
     data = (struct mstorage*)func->user_data;
 
     data->disk = rt_device_find(RT_USB_MSTORAGE_DISK_NAME);
@@ -1045,7 +1039,7 @@ static rt_err_t _function_disable(ufunction_t func)
     struct mstorage *data;
     RT_ASSERT(func != RT_NULL);
 
-    LOG_D("Mass storage function disabled");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("Mass storage function disabled\n"));
 
     data = (struct mstorage*)func->user_data;
     if(data->ep_in->buffer != RT_NULL)

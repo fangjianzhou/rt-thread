@@ -465,7 +465,7 @@ void mmcsd_set_data_timeout(struct rt_mmcsd_data       *data,
     mult = (card->card_type == CARD_TYPE_SD) ? 100 : 10;
 
     /*
-     * Scale up the multiplier (and therefore the timeout) by
+     * Scale up the multiplier (and thert_refore the timeout) by
      * the r2w factor for writes.
      */
     if (data->flags & DATA_DIR_WRITE)

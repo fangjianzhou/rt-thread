@@ -18,11 +18,11 @@
 #include "ipc/completion.h"
 #include "ipc/dataqueue.h"
 #include "ipc/workqueue.h"
-#include "ipc/condvar.h"
 #include "ipc/waitqueue.h"
 #include "ipc/pipe.h"
 #include "ipc/poll.h"
 #include "ipc/ringblk_buf.h"
+#include "ipc/condvar.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -95,11 +95,7 @@ extern "C" {
 #endif /* RT_USING_PIN */
 
 #ifdef RT_USING_SENSOR
-#ifdef RT_USING_SENSOR_V2
-#include "drivers/sensor_v2.h"
-#else
 #include "drivers/sensor.h"
-#endif /* RT_USING_SENSOR_V2 */
 #endif /* RT_USING_SENSOR */
 
 #ifdef RT_USING_CAN
@@ -169,6 +165,67 @@ extern "C" {
 #ifdef RT_USING_LCD
 #include "drivers/lcd.h"
 #endif
+
+#ifdef RT_USING_DM
+#include "drivers/core/bus.h"
+#include "drivers/core/rtdm.h"
+#include "drivers/platform.h"
+
+#ifdef RT_USING_CLK
+#include "drivers/clk.h"
+#endif
+
+#ifdef RT_USING_HWSPINLOCK
+#include "drivers/hwspinlock.h"
+#endif
+
+#ifdef RT_USING_FIRMWARE
+#ifdef RT_FIRMWARE_PSCI
+#include "drivers/psci.h"
+#endif
+#endif /* RT_USING_FIRMWARE */
+
+#ifdef RT_USING_MBOX
+#include "drivers/mailbox.h"
+#endif
+
+#ifdef RT_USING_OFW
+#include "drivers/ofw.h"
+#include "drivers/ofw_fdt.h"
+#include "drivers/ofw_io.h"
+#include "drivers/ofw_irq.h"
+#include "drivers/ofw_raw.h"
+#endif /* RT_USING_OFW */
+
+#ifdef RT_USING_PIC
+#include "drivers/pic.h"
+#endif
+
+#ifdef RT_USING_PCI
+#include "drivers/pci.h"
+#ifdef RT_PCI_MSI
+#include "drivers/pci_msi.h"
+#endif
+#endif
+
+#ifdef RT_USING_REGULATOR
+#include "drivers/regulator.h"
+#endif
+
+#ifdef RT_USING_RESET
+#include "drivers/reset.h"
+#endif
+
+#ifdef RT_MFD_SYSCON
+#include "drivers/syscon.h"
+#endif
+
+#ifdef RT_USING_VIRTIO
+#include "drivers/virtio.h"
+#include "drivers/virtq.h"
+#endif
+
+#endif /* RT_USING_DM */
 
 #ifdef __cplusplus
 }

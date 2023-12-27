@@ -18,6 +18,7 @@ typedef struct rt_condvar
 #ifdef USING_RT_OBJECT
     struct rt_object parent;
 #endif
+    struct rt_spinlock spinlock;
     rt_atomic_t waiters_cnt;
     rt_atomic_t waiting_mtx;
     struct rt_wqueue event;
@@ -34,4 +35,4 @@ rt_inline void rt_condvar_detach(rt_condvar_t cv)
     return ;
 }
 
-#endif /* __LWP_TERMINAL_CONDVAR_H__ */
+#endif

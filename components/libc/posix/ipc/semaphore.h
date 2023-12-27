@@ -16,8 +16,8 @@
 
 struct posix_sem
 {
-    /* reference count and unlinked */
-    rt_uint16_t refcount;
+    /* rt_reference count and unlinked */
+    rt_uint16_t rt_refcount;
     rt_uint8_t unlinked;
     rt_uint8_t unamed;
 

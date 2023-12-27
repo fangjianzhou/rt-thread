@@ -22,8 +22,8 @@ int dlclose(void *handle)
     module = (struct rt_dlmodule *)handle;
 
     rt_enter_critical();
-    module->nref--;
-    if (module->nref <= 0)
+    module->nrt_ref--;
+    if (module->nrt_ref <= 0)
     {
         rt_exit_critical();
 

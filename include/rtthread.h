@@ -32,6 +32,7 @@
 #include <rtm.h>
 #include <rtatomic.h>
 #include <rtsched.h>
+#include <drivers/core/driver.h>
 #ifdef RT_USING_LEGACY
 #include <rtlegacy.h>
 #endif

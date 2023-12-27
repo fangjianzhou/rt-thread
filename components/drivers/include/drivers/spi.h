@@ -78,7 +78,12 @@ struct rt_spi_configuration
 {
     rt_uint8_t mode;
     rt_uint8_t data_width;
+#ifdef RT_USING_DM
+    rt_uint8_t data_width_tx;
+    rt_uint8_t data_width_rx;
+#else
     rt_uint16_t reserved;
+#endif
 
     rt_uint32_t max_hz;
 };
@@ -89,6 +94,12 @@ struct rt_spi_bus
     struct rt_device parent;
     rt_uint8_t mode;
     const struct rt_spi_ops *ops;
+
+#ifdef RT_USING_DM
+    rt_base_t *pins;
+    rt_bool_t slave;
+    int num_chipselect;
+#endif /* RT_USING_DM */
 
     struct rt_mutex lock;
     struct rt_spi_device *owner;
@@ -103,6 +114,17 @@ struct rt_spi_ops
     rt_ssize_t (*xfer)(struct rt_spi_device *device, struct rt_spi_message *message);
 };
 
+#ifdef RT_USING_DM
+struct rt_spi_delay
+{
+#define RT_SPI_DELAY_UNIT_USECS 0
+#define RT_SPI_DELAY_UNIT_NSECS 1
+#define RT_SPI_DELAY_UNIT_SCK   2
+    rt_uint16_t value;
+    rt_uint8_t  unit;
+};
+#endif /* RT_USING_DM */
+
 /**
  * SPI Virtual BUS, one device must connected to a virtual BUS
  */
@@ -110,6 +132,17 @@ struct rt_spi_device
 {
     struct rt_device parent;
     struct rt_spi_bus *bus;
+
+#ifdef RT_USING_DM
+    const char *name;
+    const struct rt_spi_device_id *id;
+    const struct rt_ofw_node_id *ofw_id;
+
+    rt_uint8_t chip_select;
+    struct rt_spi_delay cs_setup;
+    struct rt_spi_delay cs_hold;
+    struct rt_spi_delay cs_inactive;
+#endif
 
     struct rt_spi_configuration config;
     rt_base_t cs_pin;
@@ -165,6 +198,29 @@ struct rt_qspi_device
 };
 
 #define SPI_DEVICE(dev) ((struct rt_spi_device *)(dev))
+
+#ifdef RT_USING_DM
+struct rt_spi_device_id
+{
+    char name[20];
+    void *data;
+};
+
+struct rt_spi_driver
+{
+    struct rt_driver parent;
+
+    const struct rt_spi_device_id *ids;
+    const struct rt_ofw_node_id *ofw_ids;
+
+    rt_err_t (*probe)(struct rt_spi_device *device);
+};
+
+rt_err_t rt_spi_driver_register(struct rt_spi_driver *driver);
+rt_err_t rt_spi_device_register(struct rt_spi_device *device);
+
+#define RT_SPI_DRIVER_EXPORT(driver)  RT_DRIVER_EXPORT(driver, spi, BUILIN)
+#endif /* RT_USING_DM */
 
 /* register a SPI bus */
 rt_err_t rt_spi_bus_register(struct rt_spi_bus       *bus,
@@ -237,6 +293,10 @@ rt_err_t rt_spi_send_then_send(struct rt_spi_device *device,
                                const void           *send_buf2,
                                rt_size_t             send_length2);
 
+rt_err_t rt_spi_sendrecv16(struct rt_spi_device *device,
+                           rt_uint16_t senddata,
+                           rt_uint16_t *recvdata);
+
 /**
  * This function transmits data to SPI device.
  *
@@ -251,14 +311,6 @@ rt_ssize_t rt_spi_transfer(struct rt_spi_device *device,
                            const void           *send_buf,
                            void                 *recv_buf,
                            rt_size_t             length);
-
-rt_err_t rt_spi_sendrecv8(struct rt_spi_device *device,
-                          rt_uint8_t            senddata,
-                          rt_uint8_t           *recvdata);
-
-rt_err_t rt_spi_sendrecv16(struct rt_spi_device *device,
-                           rt_uint16_t           senddata,
-                           rt_uint16_t          *recvdata);
 
 /**
  * This function transfers a message list to the SPI device.
@@ -284,6 +336,16 @@ rt_inline rt_size_t rt_spi_send(struct rt_spi_device *device,
                                 rt_size_t             length)
 {
     return rt_spi_transfer(device, send_buf, RT_NULL, length);
+}
+
+rt_inline rt_uint8_t rt_spi_sendrecv8(struct rt_spi_device *device,
+                                      rt_uint8_t            data)
+{
+    rt_uint8_t value = 0;
+
+    rt_spi_send_then_recv(device, &data, 1, &value, 1);
+
+    return value;
 }
 
 /**

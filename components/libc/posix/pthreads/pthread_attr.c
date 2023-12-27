@@ -89,7 +89,7 @@ RTM_EXPORT(pthread_attr_destroy);
  * @brief    This function set detach state attribute in thread attributes object.
  *
  * @note     This function sets the detach state attribute of the thread attributes object
- *           referred to by attr to the value specified in detachstate.  The detach state
+ *           rt_referred to by attr to the value specified in detachstate.  The detach state
  *           attribute determines whether a thread created using the thread attributes
  *           object attr will be created in a joinable or a detached state.
  *
@@ -164,7 +164,7 @@ RTM_EXPORT(pthread_attr_getdetachstate);
  * @brief    This function sets schedpolicy attribute.
  *
  * @note     The function function sets the scheduling policy attribute of the thread
- *           attributes object referred to by attr to the value specified in policy.
+ *           attributes object rt_referred to by attr to the value specified in policy.
  *
  * @see      pthread_attr_init(), pthread_attr_setscope(), pthread_attr_setinheritsched(), pthread_attr_setschedparam(), pthread_create()
  *
@@ -374,7 +374,7 @@ RTM_EXPORT(pthread_attr_getstackaddr);
  *           otherwise, an error number shall be returned to indicate the error.
  *
  * @warning  The behavior is undefined if the value specified by the attr argument to or pthread_attr_setstack()
- *           does not refer to an initialized thread attributes object.
+ *           does not rt_refer to an initialized thread attributes object.
  */
 int pthread_attr_setstack(pthread_attr_t *attr,
                           void           *stack_base,
@@ -499,7 +499,7 @@ RTM_EXPORT(pthread_attr_getguardsize);
  * @brief    This function sets inherit-scheduler attribute in thread attributes object.
  *
  * @note     The function sets the inherit-scheduler attribute of the thread attributes object
- *           referred to by attr to the value specified in inheritsched.
+ *           rt_referred to by attr to the value specified in inheritsched.
  *           The inherit-scheduler attribute determines whether a thread created using the thread
  *           attributes object attr will inherit its scheduling attributes from the calling thread
  *           or whether it will take them from attr.
@@ -534,7 +534,7 @@ RTM_EXPORT(pthread_attr_setinheritsched);
  * @brief    This function get and set the inheritsched attribute in the attr argument.
  *
  * @note     The function sets the inherit-scheduler attribute of the thread attributes object
- *           referred to by attr to the value specified in inheritsched.
+ *           rt_referred to by attr to the value specified in inheritsched.
  *           The inherit-scheduler attribute determines whether a thread created using the thread
  *           attributes object attr will inherit its scheduling attributes from the calling thread
  *           or whether it will take them from attr.

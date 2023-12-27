@@ -53,7 +53,7 @@ struct rt_dlmodule
     rt_dlmodule_init_func_t     init_func;
     rt_dlmodule_cleanup_func_t  cleanup_func;
 
-    rt_uint16_t nref;       /* reference count */
+    rt_uint16_t nrt_ref;       /* rt_reference count */
 
     rt_uint16_t nsym;       /* number of symbols in the module */
     struct rt_module_symtab *symtab;    /* module symbol table */

@@ -9,8 +9,7 @@
 #ifndef COMPLETION_H_
 #define COMPLETION_H_
 
-#include <rtdef.h>
-#include <rtconfig.h>
+#include <rtthread.h>
 
 /**
  * Completion
@@ -19,10 +18,9 @@
 struct rt_completion
 {
     rt_uint32_t flag;
-
+struct rt_spinlock spinlock;
     /* suspended list */
     rt_list_t suspended_list;
-    struct rt_spinlock spinlock;
 };
 
 void rt_completion_init(struct rt_completion *completion);

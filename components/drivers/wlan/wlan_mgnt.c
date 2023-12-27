@@ -842,6 +842,7 @@ static void rt_wlan_join_scan_callback(int event, struct rt_wlan_buff *buff, voi
 {
     struct rt_wlan_info *info = RT_NULL;
     struct rt_wlan_info *tgt_info = RT_NULL;
+    int ret = RT_EOK;
 
     RT_ASSERT(event == RT_WLAN_EVT_SCAN_REPORT);
     RT_ASSERT(buff != RT_NULL);
@@ -867,7 +868,7 @@ static void rt_wlan_join_scan_callback(int event, struct rt_wlan_buff *buff, voi
             tgt_info->rssi      = info->rssi;
             tgt_info->hidden    = info->hidden;
             /* hwaddr */
-            rt_memcpy(tgt_info->bssid,info->bssid,RT_WLAN_BSSID_MAX_LENGTH);
+            rt_memcmp(tgt_info->bssid,info->bssid,RT_WLAN_BSSID_MAX_LENGTH);
         }
     }
 }
@@ -879,6 +880,7 @@ rt_err_t rt_wlan_connect(const char *ssid, const char *password)
     struct rt_wlan_info info;
     struct rt_wlan_complete_des *complete;
     rt_uint32_t set = 0, recved = 0;
+    rt_uint32_t scan_retry = RT_WLAN_SCAN_RETRY_CNT;
 
     /* sta dev Can't be NULL */
     if (_sta_is_null())
@@ -1582,6 +1584,7 @@ rt_err_t rt_wlan_scan_with_info(struct rt_wlan_info *info)
     rt_err_t err = RT_EOK;
     struct rt_wlan_complete_des *complete;
     rt_uint32_t set = 0, recved = 0;
+    static struct rt_wlan_info scan_filter_info;
 
     if (_sta_is_null())
     {

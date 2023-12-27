@@ -50,7 +50,7 @@ const char __stderr_name[] = "STDERR";
  * required by fopen() and freopen().
  *
  * @param name - file name with path.
- * @param openmode - a bitmap hose bits mostly correspond directly to
+ * @param openmode - a rt_bitmap hose bits mostly correspond directly to
  *                     the ISO mode specification.
  * @return  -1 if an error occurs.
  */

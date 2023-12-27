@@ -308,7 +308,7 @@ int pthread_detach(pthread_t thread)
 
     if (ptd->attr.detachstate == PTHREAD_CREATE_DETACHED)
     {
-        /* The implementation has detected that the value specified by thread does not refer
+        /* The implementation has detected that the value specified by thread does not rt_refer
          * to a joinable thread.
          */
         ret = EINVAL;

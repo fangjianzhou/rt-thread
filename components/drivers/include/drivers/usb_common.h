@@ -176,8 +176,8 @@ extern "C" {
 /*
     The HcRhPortStatus[1:NDP] register is used to control and report port events on a per-port
     basis. NumberDownstreamPorts represents the number of HcRhPortStatus registers that are
-    implemented in hardware.  The lower word is used to reflect the port status, whereas the upper
-    word reflects the status change bits.  Some status bits are implemented with special write behavior
+    implemented in hardware.  The lower word is used to rt_reflect the port status, whereas the upper
+    word rt_reflects the status change bits.  Some status bits are implemented with special write behavior
     (see below).  If a transaction (token through handshake) is in progress when a write to change
     port status occurs, the resulting port status change must be postponed until the transaction
     completes.  Reserved bits should always be written '0'.

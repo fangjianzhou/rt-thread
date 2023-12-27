@@ -643,7 +643,7 @@ void msh_auto_complete_path(char *path)
             dirent = readdir(dir);
             if (dirent == RT_NULL) break;
 
-            /* matched the prefix string */
+            /* matched the prt_refix string */
             if (strncmp(index, dirent->d_name, rt_strlen(index)) == 0)
             {
                 multi ++;
@@ -713,7 +713,7 @@ void msh_auto_complete_path(char *path)
 }
 #endif /* DFS_USING_POSIX */
 
-void msh_auto_complete(char *prefix)
+void msh_auto_complete(char *prt_refix)
 {
     int length, min_length;
     const char *name_ptr, *cmd_name;
@@ -722,7 +722,7 @@ void msh_auto_complete(char *prefix)
     min_length = 0;
     name_ptr = RT_NULL;
 
-    if (*prefix == '\0')
+    if (*prt_refix == '\0')
     {
         msh_help(0, RT_NULL);
         return;
@@ -733,8 +733,8 @@ void msh_auto_complete(char *prefix)
     {
         char *ptr;
 
-        ptr = prefix + rt_strlen(prefix);
-        while (ptr != prefix)
+        ptr = prt_refix + rt_strlen(prt_refix);
+        while (ptr != prt_refix)
         {
             if (*ptr == ' ')
             {
@@ -748,7 +748,7 @@ void msh_auto_complete(char *prefix)
         /* There is a chance that the user want to run the module directly. So
          * try to complete the file names. If the completed path is not a
          * module, the system won't crash anyway. */
-        if (ptr == prefix)
+        if (ptr == prt_refix)
         {
             msh_auto_complete_path(ptr);
         }
@@ -762,7 +762,7 @@ void msh_auto_complete(char *prefix)
         {
             /* skip finsh shell function */
             cmd_name = (const char *) index->name;
-            if (strncmp(prefix, cmd_name, strlen(prefix)) == 0)
+            if (strncmp(prt_refix, cmd_name, strlen(prt_refix)) == 0)
             {
                 if (min_length == 0)
                 {
@@ -784,7 +784,7 @@ void msh_auto_complete(char *prefix)
     /* auto complete string */
     if (name_ptr != NULL)
     {
-        rt_strncpy(prefix, name_ptr, min_length);
+        rt_strncpy(prt_refix, name_ptr, min_length);
     }
 
     return ;
@@ -821,10 +821,10 @@ static msh_cmd_opt_t *msh_get_cmd_opt(char *opt_str)
     return opt;
 }
 
-static int msh_get_argc(char *prefix, char **last_argv)
+static int msh_get_argc(char *prt_refix, char **last_argv)
 {
     int argc = 0;
-    char *ch = prefix;
+    char *ch = prt_refix;
 
     while (*ch)
     {
@@ -887,19 +887,19 @@ static void msh_opt_help(msh_cmd_opt_t *cmd_opt)
     rt_kprintf("\n");
 }
 
-void msh_opt_auto_complete(char *prefix)
+void msh_opt_auto_complete(char *prt_refix)
 {
     int argc;
     char *opt_str = RT_NULL;
     msh_cmd_opt_t *opt = RT_NULL;
 
-    if ((argc = msh_get_argc(prefix, &opt_str)))
+    if ((argc = msh_get_argc(prt_refix, &opt_str)))
     {
-        opt = msh_get_cmd_opt(prefix);
+        opt = msh_get_cmd_opt(prt_refix);
     }
-    else if (!msh_get_cmd(prefix, strlen(prefix)) && (' ' == prefix[strlen(prefix) - 1]))
+    else if (!msh_get_cmd(prt_refix, strlen(prt_refix)) && (' ' == prt_refix[strlen(prt_refix) - 1]))
     {
-        opt = msh_get_cmd_opt(prefix);
+        opt = msh_get_cmd_opt(prt_refix);
     }
 
     if (opt && opt->id)

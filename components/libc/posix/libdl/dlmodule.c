@@ -502,8 +502,8 @@ struct rt_dlmodule* dlmodule_load(const char* filename)
     /* release module data */
     rt_free(module_ptr);
 
-    /* increase module reference count */
-    module->nref ++;
+    /* increase module rt_reference count */
+    module->nrt_ref ++;
 
     /* deal with cache */
 #ifdef RT_USING_CACHE
@@ -668,8 +668,8 @@ struct rt_dlmodule* dlmodule_load_custom(const char* filename, struct rt_dlmodul
         rt_free(module_ptr);
     }
 
-    /* increase module reference count */
-    module->nref ++;
+    /* increase module rt_reference count */
+    module->nrt_ref ++;
 
     /* deal with cache */
 #ifdef RT_USING_CACHE
@@ -879,13 +879,13 @@ int list_module(void)
     info = rt_object_get_information(RT_Object_Class_Module);
     list = &info->object_list;
 
-    rt_kprintf("module   ref      address \n");
+    rt_kprintf("module   rt_ref      address \n");
     rt_kprintf("-------- -------- ------------\n");
     for (node = list->next; node != list; node = node->next)
     {
         module = (struct rt_dlmodule *)(rt_list_entry(node, struct rt_object, list));
         rt_kprintf("%-*.*s %-04d  0x%08x\n",
-                   RT_NAME_MAX, RT_NAME_MAX, module->parent.name, module->nref, module->mem_space);
+                   RT_NAME_MAX, RT_NAME_MAX, module->parent.name, module->nrt_ref, module->mem_space);
     }
 
     return 0;

@@ -1,0 +1,5 @@
+menuconfig RT_USING_RESET
+    bool "Using Reset Controller support"
+    depends on RT_USING_DM
+    select RT_USING_OFW
+    default n

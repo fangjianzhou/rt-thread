@@ -553,7 +553,7 @@ static int cmd_mount(int argc, char **argv)
     {
 #ifdef RT_USING_DFS_V2
         /* display the mount history */
-        rt_kprintf("filesystem  device  mountpoint  refcount\n");
+        rt_kprintf("filesystem  device  mountpoint  rt_refcount\n");
         rt_kprintf("----------  ------  ----------  --------\n");
 
         dfs_mnt_list(RT_NULL);

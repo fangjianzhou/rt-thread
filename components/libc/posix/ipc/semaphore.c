@@ -95,8 +95,8 @@ int sem_close(sem_t *sem)
 
     /* lock posix semaphore list */
     rt_sem_take(&posix_sem_lock, RT_WAITING_FOREVER);
-    sem->refcount --;
-    if (sem->refcount == 0)
+    sem->rt_refcount --;
+    if (sem->rt_refcount == 0)
     {
         /* delete from posix semaphore list */
         if (sem->unlinked)
@@ -146,7 +146,7 @@ int sem_unlink(const char *name)
     if (psem != RT_NULL)
     {
         psem->unlinked = 1;
-        if (psem->refcount == 0)
+        if (psem->rt_refcount == 0)
         {
             /* remove this semaphore */
             posix_sem_delete(psem);
@@ -200,7 +200,7 @@ int sem_init(sem_t *sem, int pshared, unsigned int value)
     }
 
     /* initialize posix semaphore */
-    sem->refcount = 1;
+    sem->rt_refcount = 1;
     sem->unlinked = 0;
     sem->unamed = 1;
     /* lock posix semaphore list */
@@ -252,8 +252,8 @@ sem_t *sem_open(const char *name, int oflag, ...)
             rt_set_errno(ENFILE);
             goto __return;
         }
-        /* initialize reference count */
-        sem->refcount = 1;
+        /* initialize rt_reference count */
+        sem->rt_refcount = 1;
         sem->unlinked = 0;
         sem->unamed = 0;
 
@@ -266,7 +266,7 @@ sem_t *sem_open(const char *name, int oflag, ...)
         sem = posix_sem_find(name);
         if (sem != RT_NULL)
         {
-            sem->refcount ++; /* increase reference count */
+            sem->rt_refcount ++; /* increase rt_reference count */
         }
         else
         {

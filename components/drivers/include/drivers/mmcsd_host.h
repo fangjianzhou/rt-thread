@@ -87,6 +87,19 @@ struct rt_mmcsd_host_ops
     rt_int32_t (*execute_tuning)(struct rt_mmcsd_host *host, rt_int32_t opcode);
 };
 
+#ifdef RT_USING_REGULATOR
+struct rt_regulator;
+
+struct rt_mmcsd_supply
+{
+    rt_bool_t vqmmc_enabled;
+    rt_bool_t regulator_enabled;
+
+    struct rt_regulator *vmmc;  /* Card power supply */
+    struct rt_regulator *vqmmc; /* Optional Vccq supply */
+};
+#endif /* RT_USING_REGULATOR */
+
 struct rt_mmcsd_host
 {
     char name[RT_NAME_MAX];
@@ -144,6 +157,10 @@ struct rt_mmcsd_host
     rt_uint32_t       sdio_irq_num;
     struct rt_semaphore    *sdio_irq_sem;
     struct rt_thread     *sdio_irq_thread;
+
+#ifdef RT_USING_REGULATOR
+    struct rt_mmcsd_supply supply;
+#endif
 
     void *private_data;
 };

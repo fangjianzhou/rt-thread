@@ -91,7 +91,7 @@ rt_err_t dlmodule_load_shared_object(struct rt_dlmodule* module, void *module_pt
     }
 
     module->vstart_addr = vstart_addr;
-    module->nref = 0;
+    module->nrt_ref = 0;
 
     /* allocate module space */
     module->mem_space = rt_malloc(module_size);

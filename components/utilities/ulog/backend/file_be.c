@@ -155,7 +155,7 @@ static void ulog_file_backend_output_with_buf(struct ulog_backend *backend, rt_u
             ulog_file_backend_flush_with_buf(backend);
             if (buf_ptr_end == be->buf_ptr_now)
             {
-                /* There is no space, indicating that the data cannot be refreshed
+                /* There is no space, indicating that the data cannot be rt_refreshed
                    to the back end of the file Discard data and exit directly */
                 break;
             }

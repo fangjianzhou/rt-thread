@@ -15,7 +15,7 @@
 #include "syslog.h"
 
 /*
- * reference:
+ * rt_reference:
  * http://pubs.opengroup.org/onlinepubs/7908799/xsh/syslog.h.html
  * https://www.gnu.org/software/libc/manual/html_node/Submitting-Syslog-Messages.html
  * http://man7.org/linux/man-pages/man3/syslog.3.html
@@ -37,7 +37,7 @@ static rt_bool_t is_open = RT_FALSE;
 /**
  * open connection to syslog
  *
- * @param ident is an arbitrary identification string which future syslog invocations will prefix to each message.
+ * @param ident is an arbitrary identification string which future syslog invocations will prt_refix to each message.
  * @param option is not using on ulog.
  * @param facility is the default facility code for this connection.
  */

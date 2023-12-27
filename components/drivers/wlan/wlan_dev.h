@@ -418,7 +418,7 @@ struct rt_wlan_buff
 
 struct rt_filter_pattern
 {
-    rt_uint16_t offset;     /* Offset in bytes to start filtering (referenced to the start of the ethernet packet) */
+    rt_uint16_t offset;     /* Offset in bytes to start filtering (rt_referenced to the start of the ethernet packet) */
     rt_uint16_t mask_size;  /* Size of the mask in bytes */
     rt_uint8_t *mask;       /* Pattern mask bytes to be ANDed with the pattern eg. "\xff00" (must be in network byte order) */
     rt_uint8_t *pattern;    /* Pattern bytes used to filter eg. "\x0800"  (must be in network byte order) */

@@ -25,7 +25,7 @@ static void _do_push(struct rt_prio_queue *que,
     if (que->head[prio] == RT_NULL)
     {
         que->head[prio] = item;
-        que->bitmap |= 1 << prio;
+        que->rt_bitmap |= 1 << prio;
     }
     else
     {
@@ -40,7 +40,7 @@ static struct rt_prio_queue_item* _do_pop(struct rt_prio_queue *que)
     int ffs;
     struct rt_prio_queue_item *item;
 
-    ffs = __rt_ffs(que->bitmap);
+    ffs = __rt_ffs(que->rt_bitmap);
     if (ffs == 0)
         return RT_NULL;
     ffs--;
@@ -51,7 +51,7 @@ static struct rt_prio_queue_item* _do_pop(struct rt_prio_queue *que)
     que->head[ffs] = item->next;
     if (que->head[ffs] == RT_NULL)
     {
-        que->bitmap &= ~(1 << ffs);
+        que->rt_bitmap &= ~(1 << ffs);
     }
 
     return item;
@@ -239,7 +239,7 @@ void rt_prio_queue_dump(struct rt_prio_queue *que)
 {
     int level = 0;
 
-    rt_kprintf("bitmap: %08x\n", que->bitmap);
+    rt_kprintf("rt_bitmap: %08x\n", que->rt_bitmap);
     for (level = 0; level < RT_PRIO_QUEUE_PRIO_MAX; level++)
     {
         struct rt_prio_queue_item *item;

@@ -609,7 +609,7 @@ static char* dump_cmd_pkt(unsigned char *dp, size_t dsize)
     return _cmd_dump_buf;
 }
 
-static rt_err_t _chn0_echo_with(rt_uint8_t prefix,
+static rt_err_t _chn0_echo_with(rt_uint8_t prt_refix,
                                 rt_uint32_t dsize,
                                 unsigned char *dp)
 {
@@ -619,7 +619,7 @@ static rt_err_t _chn0_echo_with(rt_uint8_t prefix,
     resp = rt_malloc(dsize+1);
     if (!resp)
         return -RT_ENOMEM;
-    *resp = prefix;
+    *resp = prt_refix;
     rt_memcpy(resp+1, dp, dsize);
     vbus_verbose("%s --> remote\n", dump_cmd_pkt(resp, dsize+1));
 

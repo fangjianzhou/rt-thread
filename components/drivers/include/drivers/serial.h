@@ -152,8 +152,6 @@ struct rt_serial_device
     void *serial_rx;
     void *serial_tx;
 
-    struct rt_spinlock spinlock;
-
     struct rt_device_notify rx_notify;
 };
 typedef struct rt_serial_device rt_serial_t;
@@ -179,5 +177,4 @@ rt_err_t rt_hw_serial_register(struct rt_serial_device *serial,
                                rt_uint32_t              flag,
                                void                    *data);
 
-rt_err_t rt_hw_serial_register_tty(struct rt_serial_device *serial);
 #endif

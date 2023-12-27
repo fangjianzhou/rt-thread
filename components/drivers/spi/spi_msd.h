@@ -12,7 +12,6 @@
 #define SPI_MSD_H_INCLUDED
 
 #include <stdint.h>
-#include <rtdevice.h>
 #include <drivers/spi.h>
 
 /* SD command (SPI mode) */

@@ -376,16 +376,16 @@ static void finsh_wait_auth(void)
 }
 #endif /* FINSH_USING_AUTH */
 
-static void shell_auto_complete(char *prefix)
+static void shell_auto_complete(char *prt_refix)
 {
     rt_kprintf("\n");
-    msh_auto_complete(prefix);
+    msh_auto_complete(prt_refix);
 
 #ifdef FINSH_USING_OPTION_COMPLETION
-    msh_opt_auto_complete(prefix);
+    msh_opt_auto_complete(prt_refix);
 #endif
 
-    rt_kprintf("%s%s", FINSH_PROMPT, prefix);
+    rt_kprintf("%s%s", FINSH_PROMPT, prt_refix);
 }
 
 #ifdef FINSH_USING_HISTORY

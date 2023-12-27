@@ -1445,8 +1445,12 @@ struct rt_device
 {
     struct rt_object          parent;                   /**< inherit from rt_object */
 #ifdef RT_USING_DM
-    struct rt_driver *drv;
-    void *dtb_node;
+    struct rt_bus *bus;                                 /**< the bus mounting to */
+    rt_list_t node;                                     /**< to mount on bus */
+    struct rt_driver *drv;                              /**< driver for powering the device */
+#ifdef RT_USING_OFW
+    void *ofw_node;                                     /**< ofw node get from device tree */
+#endif
 #endif
     enum rt_device_class_type type;                     /**< device type */
     rt_uint16_t               flag;                     /**< device flag */
@@ -1488,7 +1492,7 @@ struct rt_device_id
     const char *compatible;
     void *data;
 };
-
+#if 0
 struct rt_driver
 {
 #ifdef RT_USING_DEVICE_OPS
@@ -1515,7 +1519,7 @@ struct rt_driver
     void *drv_priv_data;
 };
 typedef struct rt_driver *rt_driver_t;
-
+#endif
 /**
  * Notify structure
  */

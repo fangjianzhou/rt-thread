@@ -15,10 +15,6 @@
 
 #ifdef RT_USBH_HID
 
-#define DBG_TAG           "usbhost.hid"
-#define DBG_LVL           DBG_INFO
-#include <rtdbg.h>
-
 static struct uclass_driver hid_driver;
 static rt_list_t _protocal_list;
 
@@ -308,7 +304,8 @@ static rt_err_t rt_usbh_hid_enable(void* arg)
 
     pro_id = intf->intf_desc->bInterfaceProtocol;
 
-    LOG_D("HID device enable, protocal id %d", pro_id);
+    RT_DEBUG_LOG(RT_DEBUG_USB,
+                 ("HID device enable, protocal id %d\n", pro_id));
 
     protocal = rt_usbh_hid_protocal_find(pro_id);
     if(protocal == RT_NULL)
@@ -370,7 +367,7 @@ static rt_err_t rt_usbh_hid_disable(void* arg)
 
     RT_ASSERT(intf != RT_NULL);
 
-    LOG_D("rt_usbh_hid_disable");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("rt_usbh_hid_disable\n"));
 
     hid = (struct uhid*)intf->user_data;
     if(hid != RT_NULL)

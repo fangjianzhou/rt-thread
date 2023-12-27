@@ -533,19 +533,16 @@ static rt_ssize_t _serial_fifo_tx_blocking_buf(struct rt_device        *dev,
                                                (rt_uint8_t *)buffer + offset,
                                                size);
 
+        offset += tx_fifo->put_size;
+        size -= tx_fifo->put_size;
         /* Call the transmit interface for transmission */
         serial->ops->transmit(serial,
                              (rt_uint8_t *)buffer + offset,
                              tx_fifo->put_size,
                              RT_SERIAL_TX_BLOCKING);
-
-        offset += tx_fifo->put_size;
-        size -= tx_fifo->put_size;
         /* Waiting for the transmission to complete */
         rt_completion_wait(&(tx_fifo->tx_cpt), RT_WAITING_FOREVER);
     }
-    /* Finally Inactivate the tx->fifo */
-    tx_fifo->activated = RT_FALSE;
 
     return length;
 }
@@ -601,7 +598,7 @@ static rt_ssize_t _serial_fifo_tx_nonblocking(struct rt_device        *dev,
         return length;
     }
 
-    /* If the activated mode is RT_TRUE, it means that serial device is transmitting,
+    /* If the activated mode is RT_FALSE, it means that serial device is transmitting,
      * where only the data in the ringbuffer and there is no need to call the transmit() API.
      * Note that this part of the code requires disable interrupts
      * to prevent multi thread reentrant */
@@ -694,11 +691,11 @@ static rt_err_t rt_serial_tx_enable(struct rt_device        *dev,
             serial->ops->control(serial,
                                 RT_DEVICE_CTRL_CONFIG,
                                 (void *)RT_SERIAL_TX_BLOCKING);
-            rt_memset(&tx_fifo->rb, RT_NULL, sizeof(tx_fifo->rb));
         }
 
         tx_fifo->activated = RT_FALSE;
         tx_fifo->put_size = 0;
+        rt_memset(&tx_fifo->rb, RT_NULL, sizeof(tx_fifo->rb));
         rt_completion_init(&(tx_fifo->tx_cpt));
         dev->open_flag |= RT_SERIAL_TX_BLOCKING;
 
@@ -990,7 +987,7 @@ static rt_err_t rt_serial_close(struct rt_device *dev)
     RT_ASSERT(dev != RT_NULL);
     serial = (struct rt_serial_device *)dev;
 
-    /* this device has more reference count */
+    /* this device has more rt_reference count */
     if (dev->ref_count > 1) return -RT_ERROR;
     /* Disable serial receive mode. */
     rt_serial_rx_disable(dev, dev->open_flag &
@@ -1554,20 +1551,13 @@ void rt_hw_serial_isr(struct rt_serial_device *serial, int event)
              * then the transmit completion callback is triggered*/
             if (tx_length == 0)
             {
+                tx_fifo->activated = RT_FALSE;
                 /* Trigger the transmit completion callback */
                 if (serial->parent.tx_complete != RT_NULL)
                     serial->parent.tx_complete(&serial->parent, RT_NULL);
 
-                /* Maybe some datas left in the buffer still need to be sent in block mode,
-                 * so tx_fifo->activated should be RT_TRUE */
                 if (serial->parent.open_flag & RT_SERIAL_TX_BLOCKING)
-                {
                     rt_completion_done(&(tx_fifo->tx_cpt));
-                }
-                else
-                {
-                    tx_fifo->activated = RT_FALSE;
-                }
 
                 break;
             }

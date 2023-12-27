@@ -1412,7 +1412,7 @@ static void async_output_thread_entry(void *param)
         {
             ulog_async_output();
             /* If there is no log output for a certain period of time,
-             * refresh the log buffer
+             * rt_refresh the log buffer
              */
             if (ulog_async_waiting_log(RT_TICK_PER_SECOND * 2) == RT_EOK)
             {

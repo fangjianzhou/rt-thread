@@ -898,7 +898,7 @@
 //#define AC108_LRCK_PERIOD     (AC108_SLOT_WIDTH * (AC108_ENCODING_EN ? 2 : AC108_CHANNELS_MAX))
 #define AC108_LRCK_PERIOD       ((AC108_SLOT_WIDTH * (AC108_ENCODING_EN ? 2 : AC108_CHANNELS_MAX))/2)
 
-struct ref_chip_config {
+struct rt_ref_chip_config {
     unsigned int ref_pga;
     unsigned int ref_channel;
 };
@@ -907,7 +907,7 @@ struct twi_device {
     twi_port_t bus;
     unsigned int addr;
     unsigned int debug_mode;
-    struct ref_chip_config ref_chan;
+    struct rt_ref_chip_config ref_chan;
 };
 
 struct ac108_param {

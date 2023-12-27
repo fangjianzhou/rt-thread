@@ -130,7 +130,7 @@ rt_err_t rt_wlan_cfg_cache_save(void)
     return err;
 }
 
-rt_err_t rt_wlan_cfg_cache_refresh(void)
+rt_err_t rt_wlan_cfg_cache_rt_refresh(void)
 {
     int len = 0, i, j;
     struct cfg_save_info_head *head;

@@ -277,7 +277,7 @@ static rt_err_t enc28j60_init(rt_device_t dev)
     // For broadcast packets we allow only ARP packtets
     // All other packets should be unicast only for our mac (MAADR)
     //
-    // The pattern to match on is therefore
+    // The pattern to match on is thert_refore
     // Type     ETH.DST
     // ARP      BROADCAST
     // 06 08 -- ff ff ff ff ff ff -> ip checksum for theses bytes=f7f9

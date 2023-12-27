@@ -252,7 +252,7 @@ namespace std
             {
                 if (!pm)
                     throw_system_error(int(errc::operation_not_permitted), 
-                                        "unique_lock::lock: references null mutex");
+                                        "unique_lock::lock: rt_references null mutex");
                 else if (owns)
                     throw_system_error(int(errc::resource_deadlock_would_occur),
                                         "unique_lock::lock: already locked" );
@@ -266,7 +266,7 @@ namespace std
             {
                 if (!pm)
                     throw_system_error(int(errc::operation_not_permitted), 
-                                        "unique_lock::try_lock: references null mutex");
+                                        "unique_lock::try_lock: rt_references null mutex");
                 else if (owns)
                     throw_system_error(int(errc::resource_deadlock_would_occur),
                                         "unique_lock::try_lock: already locked" );
@@ -281,7 +281,7 @@ namespace std
             {
                 if (!pm)
                     throw_system_error(int(errc::operation_not_permitted),
-                                        "unique_lock::try_lock_for: references null mutex");
+                                        "unique_lock::try_lock_for: rt_references null mutex");
                 else if (owns)
                     throw_system_error(int(errc::resource_deadlock_would_occur),
                                         "unique_lock::try_lock_for: already locked");
@@ -296,7 +296,7 @@ namespace std
             {
                 if (!pm)
                     throw_system_error(int(errc::operation_not_permitted),
-                                        "unique_lock::try_lock_until: references null mutex");
+                                        "unique_lock::try_lock_until: rt_references null mutex");
                 else if (owns)
                     throw_system_error(int(errc::resource_deadlock_would_occur),
                                         "unique_lock::try_lock_until: already locked");

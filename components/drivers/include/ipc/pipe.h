@@ -10,10 +10,8 @@
 #ifndef PIPE_H__
 #define PIPE_H__
 
-#include <rtdef.h>
-#include <rtconfig.h>
+#include <rtthread.h>
 #include "condvar.h"
-
 /**
  * Pipe Device
  */
@@ -34,7 +32,6 @@ struct rt_pipe_device
     rt_wqueue_t writer_queue;
     int writer;
     int reader;
-
     struct rt_condvar waitfor_parter;
     struct rt_mutex lock;
 };

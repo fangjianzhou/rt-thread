@@ -25,6 +25,17 @@ void (*system_off)(void);
 
 #ifdef RT_USING_SMP
 
+#define REPORT_ERR(retval) LOG_E("got error code %d in %s(), %s:%d", (retval), __func__, __FILE__, __LINE__)
+#define CHECK_RETVAL(retval) if (retval) {REPORT_ERR(retval);}
+#define cpuid_to_hwid(cpuid) \
+    ((((cpuid) >= 0) && ((cpuid) < RT_CPUS_NR)) ? rt_cpu_mpidr_early[cpuid] : ID_ERROR)
+#define set_hwid(cpuid, hwid) \
+    ((((cpuid) >= 0) && ((cpuid) < RT_CPUS_NR)) ? (rt_cpu_mpidr_early[cpuid] = (hwid)) : ID_ERROR)
+#define get_cpu_node(cpuid) \
+    ((((cpuid) >= 0) && ((cpuid) < RT_CPUS_NR)) ? _cpu_node[cpuid] : NULL)
+#define set_cpu_node(cpuid, node) \
+    ((((cpuid) >= 0) && ((cpuid) < RT_CPUS_NR)) ? (_cpu_node[cpuid] = node) : NULL)
+
 #ifdef RT_USING_FDT
 #include "dtb_node.h"
 struct dtb_node *_cpu_node[RT_CPUS_NR];
@@ -278,7 +289,7 @@ static int _cpus_init(int num_cpus, rt_uint64_t *cpu_hw_ids, struct cpu_ops_t *c
 
         if (cpu_ops_tbl[i] && cpu_ops_tbl[i]->cpu_init)
         {
-            retval = cpu_ops_tbl[i]->cpu_init(i);
+            retval = cpu_ops_tbl[i]->cpu_init(i, RT_NULL);
             CHECK_RETVAL(retval);
         }
         else
@@ -288,30 +299,6 @@ static int _cpus_init(int num_cpus, rt_uint64_t *cpu_hw_ids, struct cpu_ops_t *c
         }
     }
     return 0;
-}
-
-static void _boot_secondary(void)
-{
-    for (int i = 1; i < RT_CPUS_NR; i++)
-    {
-        int retval = -0xbad0; // mark no support operation
-        if (cpu_ops_tbl[i] && cpu_ops_tbl[i]->cpu_boot)
-            retval = cpu_ops_tbl[i]->cpu_boot(i);
-        if (retval)
-        {
-            if (retval == -0xbad0)
-                LOG_E("No cpu_ops was probed for CPU %d. Try to configure it or use fdt", i);
-            else
-                LOG_E("Failed to boot secondary CPU %d, error code %d", i, retval);
-        } else {
-            LOG_I("Secondary CPU %d booted", i);
-        }
-    }
-}
-
-rt_weak void rt_hw_secondary_cpu_up(void)
-{
-    _boot_secondary();
 }
 
 /**

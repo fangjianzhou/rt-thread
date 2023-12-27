@@ -26,8 +26,8 @@ static int __fgetc(FILE *file);
 static FILE __stdio_in = FDEV_SETUP_STREAM(NULL, __fgetc, NULL, _FDEV_SETUP_READ);
 static FILE __stdio_out = FDEV_SETUP_STREAM(__fputc, NULL, NULL, _FDEV_SETUP_WRITE);
 
-#ifdef __strong_reference
-#define STDIO_ALIAS(x) __strong_reference(stdout, x);
+#ifdef __strong_rt_reference
+#define STDIO_ALIAS(x) __strong_rt_reference(stdout, x);
 #else
 #define STDIO_ALIAS(x) FILE *const x = &__stdio_out;
 #endif

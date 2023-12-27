@@ -14,8 +14,8 @@
 
 #define USB_THREAD_STACK_SIZE    4096
 
-#define DBG_TAG    "usb.host.hub"
-#define DBG_LVL     DBG_INFO
+#define DBG_TAG    "usbhost.hub"
+#define DBG_LVL    DBG_INFO
 #include <rtdbg.h>
 
 
@@ -405,7 +405,7 @@ static rt_err_t rt_usbh_hub_port_change(uhub_t hub)
         ret = rt_usbh_hub_get_port_status(hub, i + 1, &pstatus);
         if(ret != RT_EOK) continue;
 
-        LOG_D("port %d status 0x%x", i + 1, pstatus);
+        RT_DEBUG_LOG(RT_DEBUG_USB, ("port %d status 0x%x\n", i + 1, pstatus));
 
         /* check port status change */
         if (pstatus & PORT_CCSC)
@@ -476,13 +476,13 @@ static void rt_usbh_hub_irq(void* context)
 
     if(pipe->status != UPIPE_STATUS_OK)
     {
-        LOG_D("hub irq error");
+        RT_DEBUG_LOG(RT_DEBUG_USB,("hub irq error\n"));
         return;
     }
 
     rt_usbh_hub_port_change(hub);
 
-    LOG_D("hub int xfer...");
+    RT_DEBUG_LOG(RT_DEBUG_USB,("hub int xfer...\n"));
 
     /* parameter check */
      RT_ASSERT(pipe->inst->hcd != RT_NULL);
@@ -511,6 +511,8 @@ static rt_err_t rt_usbh_hub_enable(void *arg)
     int timeout = USB_TIMEOUT_LONG;
     /* paremeter check */
     RT_ASSERT(intf != RT_NULL);
+
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("rt_usbh_hub_run\n"));
 
     /* get usb device instance */
     device = intf->device;
@@ -611,7 +613,7 @@ static rt_err_t rt_usbh_hub_disable(void* arg)
     /* paremeter check */
     RT_ASSERT(intf != RT_NULL);
 
-    LOG_D("rt_usbh_hub_stop");
+    RT_DEBUG_LOG(RT_DEBUG_USB, ("rt_usbh_hub_stop\n"));
     hub = (uhub_t)intf->user_data;
 
     for(i=0; i<hub->num_ports; i++)
@@ -657,8 +659,10 @@ static void rt_usbh_hub_thread_entry(void* parameter)
         struct uhost_msg msg;
 
         /* receive message */
-        if (rt_mq_recv(hcd->usb_mq, &msg, sizeof(struct uhost_msg), RT_WAITING_FOREVER) < 0)
-            continue;
+        if(rt_mq_recv(hcd->usb_mq, &msg, sizeof(struct uhost_msg), RT_WAITING_FOREVER)
+            != RT_EOK ) continue;
+
+        //RT_DEBUG_LOG(RT_DEBUG_USB, ("msg type %d\n", msg.type));
 
         switch (msg.type)
         {
@@ -707,7 +711,7 @@ void rt_usbh_hub_init(uhcd_t hcd)
     {
         LOG_E("hcd->roothub: allocate buffer failed.");
         return;
-    }
+    }         
     rt_memset(hcd->roothub, 0, sizeof(struct uhub));
     hcd->roothub->is_roothub = RT_TRUE;
     hcd->roothub->hcd = hcd;

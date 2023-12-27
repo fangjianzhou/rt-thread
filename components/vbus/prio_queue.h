@@ -18,7 +18,7 @@
 struct rt_prio_queue_item;
 
 struct rt_prio_queue {
-    rt_uint32_t bitmap;
+    rt_uint32_t rt_bitmap;
     struct rt_prio_queue_item *head[RT_PRIO_QUEUE_PRIO_MAX];
     struct rt_prio_queue_item *tail[RT_PRIO_QUEUE_PRIO_MAX];
     /* push thread suspend on the mempool, not queue */

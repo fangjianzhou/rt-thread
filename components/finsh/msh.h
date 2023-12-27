@@ -14,13 +14,13 @@
 #include <rtthread.h>
 
 int msh_exec(char *cmd, rt_size_t length);
-void msh_auto_complete(char *prefix);
+void msh_auto_complete(char *prt_refix);
 
 int msh_exec_module(const char *cmd_line, int size);
 int msh_exec_script(const char *cmd_line, int size);
 
 #ifdef FINSH_USING_OPTION_COMPLETION
-void msh_opt_auto_complete(char *prefix);
+void msh_opt_auto_complete(char *prt_refix);
 
 #endif /* FINSH_USING_OPTION_COMPLETION */
 #endif

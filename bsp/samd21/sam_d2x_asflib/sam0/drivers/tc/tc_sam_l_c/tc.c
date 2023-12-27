@@ -182,7 +182,7 @@ enum status_code tc_init(
 		return STATUS_ERR_INVALID_ARG;
 	}
 
-	/* Make the counter size variable in the module_inst struct reflect
+	/* Make the counter size variable in the module_inst struct rt_reflect
 	 * the counter size in the module
 	 */
 	module_inst->counter_size = config->counter_size;

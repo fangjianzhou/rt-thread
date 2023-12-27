@@ -86,9 +86,9 @@ struct udcd_ops
     rt_err_t (*ep_clear_stall)(rt_uint8_t address);
     rt_err_t (*ep_enable)(struct uendpoint* ep);
     rt_err_t (*ep_disable)(struct uendpoint* ep);
-    rt_ssize_t (*ep_read_prepare)(rt_uint8_t address, void *buffer, rt_size_t size);
-    rt_ssize_t (*ep_read)(rt_uint8_t address, void *buffer);
-    rt_ssize_t (*ep_write)(rt_uint8_t address, void *buffer, rt_size_t size);
+    rt_size_t (*ep_read_prepare)(rt_uint8_t address, void *buffer, rt_size_t size);
+    rt_size_t (*ep_read)(rt_uint8_t address, void *buffer);
+    rt_size_t (*ep_write)(rt_uint8_t address, void *buffer, rt_size_t size);
     rt_err_t (*ep0_send_status)(void);
     rt_err_t (*suspend)(void);
     rt_err_t (*wakeup)(void);

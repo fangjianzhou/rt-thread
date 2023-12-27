@@ -38,7 +38,7 @@ rt_weak void *__dso_handle = 0;
  * @brief   This function initializes the C++ runtime environment for ARM and GCC compilers.
  *
  * @note    If there is no SHT$$INIT_ARRAY section, calling $Super$$__cpp_initialize__aeabi_() will cause an error
- *          in ARMCC compiler. Therefore, this function manually iterates through the base addresses of the
+ *          in ARMCC compiler. Thert_refore, this function manually iterates through the base addresses of the
  *          SHT$$INIT_ARRAY section to call the constructor functions of each object. In GCC compiler, this function
  *          uses the __ctors_start__ and __ctors_end__ global variables to determine the range of constructor function
  *          pointers and calls each constructor function of every object in that range.

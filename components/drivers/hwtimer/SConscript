@@ -1,8 +1,24 @@
 from building import *
 
-cwd     = GetCurrentDir()
-src     = Glob('*.c')
+group = []
+
+if not GetDepend(['RT_USING_HWTIMER']):
+    Return('group')
+
+cwd = GetCurrentDir()
 CPPPATH = [cwd + '/../include']
-group   = DefineGroup('DeviceDrivers', src, depend = ['RT_USING_HWTIMER'], CPPPATH = CPPPATH)
+
+src = ['hwtimer.c']
+
+if GetDepend(['RT_HWTIMER_ARM_ARCH']):
+    src += ['hwtimer-arm_arch.c']
+
+if GetDepend(['RT_HWTIMER_BCM2835']):
+    src += ['hwtimer-bcm2835_timer.c']
+
+if GetDepend(['RT_HWTIMER_ROCKCHIP']):
+    src += ['hwtimer-rockchip_timer.c']
+
+group = DefineGroup('DeviceDrivers', src, depend = [''], CPPPATH = CPPPATH)
 
 Return('group')

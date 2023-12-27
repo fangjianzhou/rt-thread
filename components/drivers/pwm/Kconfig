@@ -1,0 +1,10 @@
+menuconfig RT_USING_PWM
+    bool "Using PWM device drivers"
+    default n
+
+config RT_PWM_ROCKCHIP
+    bool "Rockchip PWM support"
+    select RT_USING_PINCTRL
+    depends on RT_USING_DM
+    depends on RT_USING_PWM
+    default n

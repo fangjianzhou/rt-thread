@@ -442,9 +442,9 @@ do {                                                                            
  * if someone used the same symbol for the head and deletee, like
  *  HASH_DELETE(hh,users,users);
  * We want that to work, but by changing the head (users) below
- * we were forfeiting our ability to further refer to the deletee (users)
+ * we were forfeiting our ability to further rt_refer to the deletee (users)
  * in the patch-up process. Solution: use scratch space to
- * copy the deletee pointer, then the latter references are via that
+ * copy the deletee pointer, then the latter rt_references are via that
  * scratch pointer rather than through the repointed (users) symbol.
  */
 #define HASH_DELETE(hh,head,delptr)                                              \
@@ -568,7 +568,7 @@ do {                                                                            
 #define HASH_FSCK(hh,head,where)
 #endif
 
-/* When compiled with -DHASH_EMIT_KEYS, length-prefixed keys are emitted to
+/* When compiled with -DHASH_EMIT_KEYS, length-prt_refixed keys are emitted to
  * the descriptor to which this macro is defined for tuning the hash function.
  * The app can #include <unistd.h> to get the prototype for write(2). */
 #ifdef HASH_EMIT_KEYS

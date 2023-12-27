@@ -19,6 +19,10 @@
 #define DBG_LVL    DBG_INFO
 #include <rtdbg.h>
 
+#ifdef RT_USING_DM
+#include "spi_dm.h"
+#endif
+
 extern rt_err_t rt_spi_bus_device_init(struct rt_spi_bus *bus, const char *name);
 extern rt_err_t rt_spidev_device_init(struct rt_spi_device *dev, const char *name);
 
@@ -40,6 +44,40 @@ rt_err_t rt_spi_bus_register(struct rt_spi_bus       *bus,
     bus->owner = RT_NULL;
     /* set bus mode */
     bus->mode = RT_SPI_BUS_MODE_SPI;
+
+#ifdef RT_USING_DM
+    if (!bus->slave)
+    {
+        int pin_count = rt_pin_get_named_pin_count(&bus->parent, "cs");
+
+        if (pin_count >= 0)
+        {
+            pin_count = rt_max_t(int, pin_count, bus->num_chipselect);
+            bus->pins = rt_malloc(sizeof(bus->pins[0]) * pin_count);
+
+            if (!bus->pins)
+            {
+                return -RT_ENOMEM;
+            }
+
+            for (int i = 0; i < pin_count; ++i)
+            {
+                bus->pins[i] = rt_pin_get_named_pin(&bus->parent, "cs", i,
+                        RT_NULL, RT_NULL);
+            }
+        }
+        else
+        {
+            result = pin_count;
+
+            LOG_E("CS PIN find error = %s", rt_strerror(result));
+
+            return result;
+        }
+    }
+
+    spi_bus_scan_devices(bus);
+#endif
 
     return RT_EOK;
 }
@@ -94,20 +132,11 @@ rt_err_t rt_spi_configure(struct rt_spi_device        *device,
 
     RT_ASSERT(device != RT_NULL);
 
-    /* If the configurations are the same, we don't need to set again. */
-    if(device->config.data_width == cfg->data_width &&
-       device->config.mode       == (cfg->mode & RT_SPI_MODE_MASK) &&
-       device->config.max_hz     == cfg->max_hz)
-    {
-        return RT_EOK;
-    }
-
     /* set configuration */
     device->config.data_width = cfg->data_width;
-    device->config.mode       = cfg->mode & RT_SPI_MODE_MASK;
-    device->config.max_hz     = cfg->max_hz;
+    device->config.mode       = cfg->mode & RT_SPI_MODE_MASK ;
+    device->config.max_hz     = cfg->max_hz ;
 
-    /* reset the CS pin */
     if (device->cs_pin != PIN_NONE)
     {
         if (device->config.mode & RT_SPI_CS_HIGH)
@@ -352,26 +381,11 @@ __exit:
     return result;
 }
 
-rt_err_t rt_spi_sendrecv8(struct rt_spi_device *device,
-                          rt_uint8_t            senddata,
-                          rt_uint8_t           *recvdata)
-{
-    rt_ssize_t len = rt_spi_transfer(device, &senddata, recvdata, 1);
-    if (len < 0)
-    {
-        return (rt_err_t)len;
-    }
-    else
-    {
-        return RT_EOK;
-    }
-}
-
 rt_err_t rt_spi_sendrecv16(struct rt_spi_device *device,
-                           rt_uint16_t           senddata,
-                           rt_uint16_t          *recvdata)
+                           rt_uint16_t senddata,
+                           rt_uint16_t *recvdata)
 {
-    rt_ssize_t len;
+    rt_err_t result;
     rt_uint16_t tmp;
 
     if (device->config.mode & RT_SPI_MSB)
@@ -380,10 +394,10 @@ rt_err_t rt_spi_sendrecv16(struct rt_spi_device *device,
         senddata = tmp;
     }
 
-    len = rt_spi_transfer(device, &senddata, recvdata, 2);
-    if(len < 0)
+    result = rt_spi_send_then_recv(device, &senddata, 2, recvdata, 2);
+    if(result != RT_EOK)
     {
-        return (rt_err_t)len;
+        return result;
     }
 
     if (device->config.mode & RT_SPI_MSB)
@@ -392,7 +406,7 @@ rt_err_t rt_spi_sendrecv16(struct rt_spi_device *device,
         *recvdata = tmp;
     }
 
-    return RT_EOK;
+    return result;
 }
 
 struct rt_spi_message *rt_spi_transfer_message(struct rt_spi_device  *device,

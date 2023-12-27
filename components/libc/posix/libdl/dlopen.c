@@ -25,7 +25,7 @@ void* dlopen(const char *filename, int flags)
     /* check parameters */
     RT_ASSERT(filename != RT_NULL);
 
-    if (filename[0] != '/') /* it's a relative path, prefix with MODULE_ROOT_DIR */
+    if (filename[0] != '/') /* it's a relative path, prt_refix with MODULE_ROOT_DIR */
     {
         fullpath = rt_malloc(strlen(def_path) + strlen(filename) + 2);
 
@@ -46,7 +46,7 @@ void* dlopen(const char *filename, int flags)
     if(module != RT_NULL)
     {
         rt_exit_critical();
-        module->nref++;
+        module->nrt_ref++;
     }
     else
     {

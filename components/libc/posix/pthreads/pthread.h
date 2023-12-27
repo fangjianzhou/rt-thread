@@ -118,7 +118,7 @@ struct pthread_rwlock
 
     int rw_nwaitreaders;    /* the number of reader threads waiting */
     int rw_nwaitwriters;    /* the number of writer threads waiting */
-    int rw_refcount;    /* 0: unlocked, -1: locked by writer, > 0 locked by n readers */
+    int rw_rt_refcount;    /* 0: unlocked, -1: locked by writer, > 0 locked by n readers */
 };
 typedef struct pthread_rwlock pthread_rwlock_t;
 

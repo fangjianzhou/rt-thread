@@ -1,15 +1,24 @@
 from building import *
 
-cwd = GetCurrentDir()
-src = []
-CPPPATH = [cwd + '/../include']
 group = []
 
-if GetDepend(['RT_USING_PM']):
-    src = src + ['pm.c']
-    src = src + ['lptimer.c']
+if not GetDepend(['RT_USING_PM']):
+    Return('group')
 
-if len(src):
-    group = DefineGroup('DeviceDrivers', src, depend = [''], CPPPATH = CPPPATH)
+cwd = GetCurrentDir()
+CPPPATH = [cwd + '/../include']
+
+src = ['pm.c', 'lptimer.c']
+
+if GetDepend(['RT_PM_BCM2835']):
+    src += ['pm-bcm2835.c']
+
+if GetDepend(['RT_PM_SYSCON_POWEROFF']):
+    src += ['pm-syscon-poweroff.c']
+
+if GetDepend(['RT_PM_SYSCON_REBOOT']):
+    src += ['pm-syscon-reboot.c']
+
+group = DefineGroup('DeviceDrivers', src, depend = [''], CPPPATH = CPPPATH)
 
 Return('group')

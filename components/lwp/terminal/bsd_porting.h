@@ -189,7 +189,7 @@ typedef rt_base_t vm_ooffset_t;
 typedef rt_ubase_t vm_paddr_t;
 typedef rt_ubase_t vm_pindex_t;
 typedef rt_ubase_t vm_size_t;
-typedef rt_bool_t bool;
+// typedef rt_bool_t bool;
 typedef char *rt_caddr_t;
 
 /*

@@ -38,6 +38,7 @@
 #include <netif/ethernetif.h>
 #include <netif/etharp.h>
 
+#undef RT_USING_SMP
 #ifdef RT_USING_SMP
 static struct rt_mutex _mutex = {0};
 #else

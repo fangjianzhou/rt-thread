@@ -134,7 +134,14 @@ rt_isr_handler_t rt_hw_interrupt_install(int              vector,
                                          const char      *name);
 
 #ifdef RT_USING_SMP
-rt_base_t rt_hw_local_irq_disable();
+extern  rt_base_t rt_hw_local_irq_disable_inner(void);
+extern rt_err_t rt_backtrace_mem(void);
+rt_inline rt_base_t rt_hw_local_irq_disable(void)
+{
+
+    //rt_backtrace_mem();
+    return rt_hw_local_irq_disable_inner();
+}
 void rt_hw_local_irq_enable(rt_base_t level);
 
 rt_base_t rt_cpus_lock(void);

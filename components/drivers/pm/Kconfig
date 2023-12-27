@@ -1,4 +1,4 @@
-menuconfig RT_USING_PM
+menuconfig RTT_USING_PM
     bool "Using Power Management device drivers"
     default n
 

@@ -28,7 +28,7 @@ struct rt_clk_node
     const struct rt_clk_ops *ops;
 
     struct rt_clk_node *parent;
-    struct rt_ref rt_ref;
+    struct rt_ref ref;
 
     rt_ubase_t rate;
     rt_ubase_t min_rate;
@@ -39,6 +39,7 @@ struct rt_clk_node
     void *priv;
 
     struct rt_clk *clk;
+     rt_size_t multi_clk;
 };
 
 struct rt_clk_fixed_rate
@@ -81,6 +82,10 @@ struct rt_clk_ops
     rt_bool_t   (*is_enabled)(struct rt_clk *);
     rt_err_t    (*set_rate)(struct rt_clk *, rt_ubase_t rate, rt_ubase_t parent_rate);
     rt_err_t    (*set_parent)(struct rt_clk *, struct rt_clk *parent);
+    rt_err_t    (*set_phase)(struct rt_clk *, int degrees);
+    rt_base_t   (*get_phase)(struct rt_clk *);
+    rt_base_t   (*round_rate)(struct rt_clk *, rt_ubase_t drate, rt_ubase_t *prate);
+
 };
 
 struct rt_clk_notifier;

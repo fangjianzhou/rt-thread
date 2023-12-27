@@ -1549,6 +1549,16 @@ rt_weak rt_err_t rt_backtrace(void)
     rt_hw_backtrace_frame_unwind(rt_thread_self(), &frame);
     return rt_backtrace_frame(&frame);
 }
+rt_err_t rt_backtrace_frame_mem(struct rt_hw_backtrace_frame *frame);
+rt_weak rt_err_t rt_backtrace_mem(void)
+{
+    struct rt_hw_backtrace_frame frame = {
+        .fp = (rt_base_t)__builtin_frame_address(0U),
+        .pc = ({__label__ pc; pc: (rt_base_t)&&pc;})
+    };
+    rt_hw_backtrace_frame_unwind(rt_thread_self(), &frame);
+    return rt_backtrace_frame_mem(&frame);
+}
 
 #else /* otherwise not implemented */
 rt_weak rt_err_t rt_backtrace(void)
@@ -1563,7 +1573,7 @@ rt_err_t rt_backtrace_frame(struct rt_hw_backtrace_frame *frame)
 {
     long nesting = 0;
 
-    rt_kprintf("please use: addr2line -e rtthread.elf -a -f");
+    rt_kprintf("please use: addr2line -e rtthread.elf -a -f\n");
 
     while (nesting < RT_BACKTRACE_LEVEL_MAX_NR)
     {
@@ -1575,6 +1585,26 @@ rt_err_t rt_backtrace_frame(struct rt_hw_backtrace_frame *frame)
         nesting++;
     }
     rt_kprintf("\n");
+    return RT_EOK;
+}
+
+char bt[400];
+rt_err_t rt_backtrace_frame_mem(struct rt_hw_backtrace_frame *frame)
+{
+    long nesting = 0;
+
+    //rt_kprintf("please use: addr2line -e rtthread.elf -a -f");
+
+    while (nesting < RT_BACKTRACE_LEVEL_MAX_NR)
+    {
+        rt_sprintf(&bt[nesting*19]," 0x%lx", (rt_ubase_t)frame->pc);
+        if (rt_hw_backtrace_frame_unwind(rt_thread_self(), frame))
+        {
+            break;
+        }
+        nesting++;
+    }
+    rt_sprintf(&bt[nesting*19],"\n\0");
     return RT_EOK;
 }
 

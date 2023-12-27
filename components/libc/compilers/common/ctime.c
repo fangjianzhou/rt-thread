@@ -813,10 +813,10 @@ static void _lwp_timer_event_from_tid(struct rt_work *work, void *param)
     RT_ASSERT(data->tid);
 
     /* stop others from delete thread */
-    thread = lwp_tid_get_thread_and_inc_rt_ref(data->tid);
+    thread = lwp_tid_get_thread_and_inc_ref(data->tid);
     /** The tid of thread is a READ ONLY value, but here still facing the risk of thread already been delete error */
     ret = lwp_thread_signal_kill(thread, data->signo, SI_TIMER, 0);
-    lwp_tid_dec_rt_ref(thread);
+    lwp_tid_dec_ref(thread);
 
     if (ret)
     {
@@ -833,12 +833,12 @@ static void _lwp_timer_event_from_pid(struct rt_work *work, void *param)
     lwp_pid_lock_take();
     lwp = lwp_from_pid_locked(data->pid);
     if (lwp)
-        lwp_rt_ref_inc(lwp);
+        lwp_ref_inc(lwp);
     lwp_pid_lock_release();
 
     ret = lwp_signal_kill(lwp, data->signo, SI_TIMER, 0);
     if (lwp)
-        lwp_rt_ref_dec(lwp);
+        lwp_ref_dec(lwp);
 
     if (ret)
     {

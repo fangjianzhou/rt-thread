@@ -87,7 +87,7 @@ void rt_hw_interrupt_uninstall(int vector, rt_isr_handler_t handler, void *param
 #ifdef RT_USING_SMP
 void rt_hw_ipi_send(int ipi_vector, unsigned int cpu_mask)
 {
-    DECLARE_BITMAP(cpu_masks, RT_CPUS_NR) = { cpu_mask };
+    RT_DECLARE_BITMAP(cpu_masks, RT_CPUS_NR) = { cpu_mask };
 
     rt_pic_irq_send_ipi(ipi_vector, cpu_masks);
 }

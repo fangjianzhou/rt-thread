@@ -150,7 +150,7 @@ struct rt_pci_device
     rt_uint8_t pcie_cap;
     rt_uint8_t msi_cap;
     rt_uint8_t msix_cap;
-    RT_RT_DECLARE_BITMAP(flags, PCI_FLAGS_NR);
+    RT_DECLARE_BITMAP(flags, PCI_FLAGS_NR);
 
 #ifdef RT_PCI_MSI
     void *msix_base;

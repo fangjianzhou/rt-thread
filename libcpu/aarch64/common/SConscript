@@ -9,7 +9,7 @@ src     = Glob('*.c') + Glob('*.cpp') + Glob('*.S')
 CPPPATH = [cwd]
 
 if GetDepend('RT_USING_PIC') == True:
-    SrcRemove(src, ['gicv3.c', 'gic.c', 'interrupt.c', 'gtimer.c'])
+    SrcRemove(src, ['gicv3.c', 'gic.c',  'gtimer.c'])
     
 group = DefineGroup('common', src, depend = [''], CPPPATH = CPPPATH)
 

@@ -10,27 +10,11 @@
 
 #include <rtthread.h>
 
-#include <virtio_console.h>
+#if defined(RT_USING_POSIX_DEVIO) && defined(RT_USING_SMART)
+#include <console.h>
+#endif
 
-static int console_init()
-{
-    rt_err_t status = RT_EOK;
-    rt_device_t device = rt_device_find("virtio-console0");
-
-    if (device != RT_NULL && rt_device_open(device, 0) == RT_EOK)
-    {
-        /* Create vport0p1 */
-        status = rt_device_control(device, VIRTIO_DEVICE_CTRL_CONSOLE_PORT_CREATE, RT_NULL);
-    }
-
-    if (device != RT_NULL)
-    {
-        rt_device_close(device);
-    }
-
-    return status;
-}
-INIT_ENV_EXPORT(console_init);
+#ifdef FINSH_USING_MSH
 
 static int console(int argc, char **argv)
 {
@@ -42,6 +26,23 @@ static int console(int argc, char **argv)
         {
             rt_kprintf("console change to %s\n", argv[2]);
             rt_console_set_device(argv[2]);
+
+        #ifdef RT_USING_POSIX_DEVIO
+            {
+                rt_device_t dev = rt_device_find(argv[2]);
+
+                if (dev != RT_NULL)
+                {
+                    #ifdef RT_USING_SMART
+                        console_set_iodev(dev);
+                    #else
+                        rt_kprintf("TODO not supported\n");
+                    #endif
+                }
+            }
+        #else
+            finsh_set_device(argv[2]);
+        #endif /* RT_USING_POSIX_DEVIO */
         }
         else
         {
@@ -58,3 +59,5 @@ static int console(int argc, char **argv)
     return result;
 }
 MSH_CMD_EXPORT(console, set console name);
+
+#endif /* FINSH_USING_MSH */

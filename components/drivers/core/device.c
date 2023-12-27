@@ -17,7 +17,9 @@
 
 #include <rtthread.h>
 #include <drivers/core/bus.h>
-
+#define DBG_TAG "bus"
+#define DBG_LVL DBG_INFO
+#include <rtdbg.h>
 #ifdef RT_USING_POSIX_DEVIO
 #include <rtdevice.h> /* for wqueue_init */
 #endif /* RT_USING_POSIX_DEVIO */

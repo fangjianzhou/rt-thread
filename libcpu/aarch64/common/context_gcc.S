@@ -294,7 +294,7 @@ START_POINT_END(_thread_start)
 .endm
 
 #ifdef RT_USING_SMP
-#define rt_hw_interrupt_disable rt_hw_local_irq_disable
+#define rt_hw_interrupt_disable rt_hw_local_irq_disable_inner
 #define rt_hw_interrupt_enable rt_hw_local_irq_enable
 #endif
 

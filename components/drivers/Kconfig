@@ -307,6 +307,7 @@ source "$RTT_DIR/components/drivers/spi/Kconfig"
 source "$RTT_DIR/components/drivers/virtio/Kconfig"
 source "$RTT_DIR/components/drivers/watchdog/Kconfig"
 source "$RTT_DIR/components/drivers/net/Kconfig"
+source "$RTT_DIR/components/drivers/ktime/Kconfig"
 
 menu "Using USB"
     config RT_USING_USB

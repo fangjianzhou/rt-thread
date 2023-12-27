@@ -31,6 +31,7 @@
 #define RT_USING_DEBUG
 #define RT_DEBUGING_COLOR
 #define RT_DEBUGING_CONTEXT
+#define RT_DEBUGING_AUTO_INIT
 
 /* Inter-Thread communication */
 
@@ -178,8 +179,6 @@
 #define RT_PINCTRL_ROCKCHIP
 #define RT_USING_PIN
 #define RT_PIN_ROCKCHIP
-#define RT_USING_PM
-#define PM_TICKLESS_THRESHOLD_TIME 2
 #define RT_USING_PWM
 #define RT_PWM_ROCKCHIP
 #define RT_USING_REGULATOR
@@ -218,6 +217,7 @@
 #define RT_USING_NET
 #define RT_USING_DWC_EQOS
 #define RT_USING_DWC_EQOS_ROCKCHIP
+#define RT_USING_KTIME
 
 /* Using USB */
 

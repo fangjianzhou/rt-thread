@@ -2,7 +2,7 @@ from building import *
 
 group = []
 
-if not GetDepend(['RT_FIRMWARE_QEMU_FW_CFG']):
+if not GetDepend(['1RT_FIRMWARE_QEMU_FW_CFG']):
     Return('group')
 
 cwd = GetCurrentDir()

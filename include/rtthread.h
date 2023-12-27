@@ -782,6 +782,7 @@ while (0)
  *     3) scheduler is not locked.
  *     4) interrupt is not disabled.
  */
+extern char bt[400];
 #define RT_DEBUG_SCHEDULER_AVAILABLE(need_check)                              \
 do                                                                            \
 {                                                                             \
@@ -793,6 +794,7 @@ do                                                                            \
         {                                                                     \
             rt_kprintf("Function[%s]: scheduler is not available\n",          \
                     __FUNCTION__);                                            \
+            rt_kprintf("%s",bt);                                              \
             RT_ASSERT(0)                                                      \
         }                                                                     \
         if (interrupt_disabled == RT_TRUE)                                    \

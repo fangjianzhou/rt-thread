@@ -21,7 +21,7 @@
 #include <cpuport.h>
 
 #include <drivers/ofw.h>
-#include <dfs_directfs.h>
+//#include <dfs_directfs.h>
 
 #include "fw_cfg.h"
 

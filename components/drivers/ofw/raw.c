@@ -7,7 +7,7 @@
  * Date           Author       Notes
  * 2022-10-19     GuEe-GUI     first version
  */
-#include <posix/string.h>
+
 #include <drivers/ofw_raw.h>
 
 int fdt_add_subnode_possible(void *fdt, int parentoffset, const char *name)

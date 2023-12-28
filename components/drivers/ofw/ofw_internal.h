@@ -12,7 +12,7 @@
 #define __OFW_INTERNAL_H__
 
 #include <rtthread.h>
-
+#include <posix/string.h>
 #include <drivers/ofw.h>
 
 #define OFW_PHANDLE_MIN     1

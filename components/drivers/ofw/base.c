@@ -7,7 +7,7 @@
  * Date           Author       Notes
  * 2022-08-25     GuEe-GUI     first version
  */
-#include <posix/string.h>
+
 #include <rtthread.h>
 
 #include <drivers/ofw.h>
@@ -27,7 +27,7 @@ struct rt_ofw_node *ofw_node_chosen = RT_NULL;
 struct rt_ofw_node *ofw_node_aliases = RT_NULL;
 struct rt_ofw_node *ofw_node_reserved_memory = RT_NULL;
 
-static rt_phandle _phandle_range[2] = { 1, 1 };
+static rt_phandle _phandle_range[2] = { 1, 1 }, _phandle_next = 1;
 static struct rt_ofw_node **_phandle_hash = RT_NULL;
 
 static rt_list_t _aliases_nodes = RT_LIST_OBJECT_INIT(_aliases_nodes);
@@ -91,6 +91,40 @@ static void ofw_prop_destroy(struct rt_ofw_prop *prop)
 
         prop = next;
     }
+}
+
+static rt_phandle ofw_phandle_next(void)
+{
+    rt_phandle next;
+    static struct rt_spinlock op_lock = {};
+
+    rt_hw_spin_lock(&op_lock.lock);
+
+    RT_ASSERT(_phandle_next != OFW_PHANDLE_MAX);
+
+    if (_phandle_next <= _phandle_range[1])
+    {
+        next = _phandle_next++;
+    }
+    else
+    {
+        rt_err_t err = ofw_phandle_hash_reset(_phandle_range[0], _phandle_next);
+
+        if (!err)
+        {
+            next = _phandle_next++;
+        }
+        else
+        {
+            next = 0;
+            LOG_E("Expanded phandle hash[%u, %u] fail error = %s",
+                    _phandle_range[0], _phandle_next + 1, rt_strerror(err));
+        }
+    }
+
+    rt_hw_spin_unlock(&op_lock.lock);
+
+    return next;
 }
 
 static struct rt_ofw_node *ofw_get_next_node(struct rt_ofw_node *prev)
@@ -196,7 +230,7 @@ rt_err_t rt_ofw_node_destroy(struct rt_ofw_node *np)
 
     if (np)
     {
-        if (rt_ref_read(&np->rt_ref) <= 1)
+        if (rt_ref_read(&np->ref) <= 1)
         {
             ofw_node_destroy(np);
         }
@@ -217,8 +251,8 @@ struct rt_ofw_node *rt_ofw_node_get(struct rt_ofw_node *np)
 {
     if (np)
     {
-        LOG_D("%s get rt_ref = %d", np->full_name, rt_ref_read(&np->rt_ref));
-        rt_ref_get(&np->rt_ref);
+        LOG_D("%s get ref = %d", np->full_name, rt_ref_read(&np->ref));
+        rt_ref_get(&np->ref);
     }
 
     return np;
@@ -226,7 +260,7 @@ struct rt_ofw_node *rt_ofw_node_get(struct rt_ofw_node *np)
 
 static void ofw_node_release(struct rt_ref *r)
 {
-    struct rt_ofw_node *np = rt_container_of(r, struct rt_ofw_node, rt_ref);
+    struct rt_ofw_node *np = rt_container_of(r, struct rt_ofw_node, ref);
 
     LOG_E("%s is release", np->full_name);
 
@@ -237,8 +271,8 @@ void rt_ofw_node_put(struct rt_ofw_node *np)
 {
     if (np)
     {
-        LOG_D("%s put rt_ref = %d", np->full_name, rt_ref_read(&np->rt_ref));
-        rt_ref_put(&np->rt_ref, &ofw_node_release);
+        LOG_D("%s put ref = %d", np->full_name, rt_ref_read(&np->ref));
+        rt_ref_put(&np->ref, &ofw_node_release);
     }
 }
 
@@ -257,13 +291,13 @@ rt_bool_t rt_ofw_node_tag_equ(const struct rt_ofw_node *np, const char *tag)
     return ret;
 }
 
-rt_bool_t rt_ofw_node_tag_prt_refix(const struct rt_ofw_node *np, const char *prt_refix)
+rt_bool_t rt_ofw_node_tag_prefix(const struct rt_ofw_node *np, const char *prefix)
 {
     rt_bool_t ret = RT_FALSE;
 
-    if (np && prt_refix)
+    if (np && prefix)
     {
-        ret = !rt_strncmp(rt_fdt_node_name(np->full_name), prt_refix, rt_strlen(prt_refix));
+        ret = !rt_strncmp(rt_fdt_node_name(np->full_name), prefix, rt_strlen(prefix));
     }
 
     return ret;
@@ -1019,7 +1053,7 @@ rt_err_t ofw_alias_scan(void)
         struct alias_info *info;
         const char *name = prop->name, *end;
 
-        /* Maybe the bootloader will set the name, or other nodes rt_reference the aliases */
+        /* Maybe the bootloader will set the name, or other nodes reference the aliases */
         if (!rt_strcmp(name, "name") || !rt_strcmp(name, "phandle"))
         {
             continue;
@@ -1151,18 +1185,119 @@ int rt_ofw_get_alias_last_id(const char *tag)
 
     return id;
 }
+struct rt_ofw_node *rt_ofw_append_child(struct rt_ofw_node *parent, const char *full_name)
+{
+    rt_phandle phandle;
+    rt_err_t err = RT_EOK;
+    fdt32_t *phandle_value;
+    struct rt_ofw_node *np = RT_NULL, *child;
 
+    if (full_name)
+    {
+        if ((phandle = ofw_phandle_next()))
+        {
+            np = rt_calloc(1, sizeof(*np) + sizeof(*phandle_value));
+        }
+    }
+
+    if (np)
+    {
+        parent = parent ? : ofw_node_root;
+
+        np->full_name = full_name;
+        np->phandle = phandle;
+        np->parent = parent;
+
+        rt_ref_init(&np->ref);
+
+        phandle_value = (void *)np + sizeof(*np);
+        *phandle_value = cpu_to_fdt32(phandle);
+
+        err = rt_ofw_append_prop(np, "phandle", sizeof(*phandle_value), phandle_value);
+
+        if (!err)
+        {
+            if (parent->child)
+            {
+                rt_ofw_foreach_child_node(parent, child)
+                {
+                    if (!child->sibling)
+                    {
+                        child->sibling = np;
+                        rt_ofw_node_put(child);
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                parent->child = np;
+            }
+        }
+        else
+        {
+            rt_free(np);
+            np = RT_NULL;
+        }
+    }
+
+    return np;
+}
+
+rt_err_t rt_ofw_append_prop(struct rt_ofw_node *np, const char *name, int length, void *value)
+{
+    rt_err_t err = RT_EOK;
+
+    if (np && name && ((length && value) || (!length && !value)))
+    {
+        struct rt_ofw_prop *prop = rt_malloc(sizeof(*prop)), *last_prop;
+
+        if (prop)
+        {
+            prop->name = name;
+            prop->length = length;
+            prop->value = value;
+            prop->next = RT_NULL;
+
+            if (np->props)
+            {
+                rt_ofw_foreach_prop(np, last_prop)
+                {
+                    if (!last_prop->next)
+                    {
+                        last_prop->next = prop;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                np->props = prop;
+            }
+        }
+        else
+        {
+            err = -RT_ENOMEM;
+        }
+    }
+    else
+    {
+        err = -RT_EINVAL;
+    }
+
+    return err;
+}
 struct rt_ofw_node *rt_ofw_parse_phandle(const struct rt_ofw_node *np, const char *phandle_name, int index)
 {
     struct rt_ofw_cell_args args;
-    struct rt_ofw_node *rt_ref_np = RT_NULL;
+    struct rt_ofw_node *ref_np = RT_NULL;
 
     if (!rt_ofw_parse_phandle_cells(np, phandle_name, RT_NULL, index, &args))
     {
-        rt_ref_np = args.data;
+        ref_np = args.data;
     }
 
-    return rt_ref_np;
+    return ref_np;
 }
 
 static rt_err_t ofw_parse_phandle_cells(const struct rt_ofw_node *np, const char *list_name, const char *cells_name,

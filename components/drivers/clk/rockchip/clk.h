@@ -32,44 +32,19 @@ struct rk_cpu_rate_table
 
 struct rk_pll_rate_table
 {
-	rt_ubase_t rate;
-	union {
-		struct {
-			/* for RK3066 */
-			rt_uint32_t nr;
-			rt_uint32_t nf;
-			rt_uint32_t no;
-			rt_uint32_t nb;
-		};
-		struct {
-			/* for RK3036/RK3399 */
-			rt_uint32_t fbdiv;
-			rt_uint32_t postdiv1;
-			rt_uint32_t refdiv;
-			rt_uint32_t postdiv2;
-			rt_uint32_t dsmpd;
-			rt_uint32_t frac;
-		};
-		struct {
-			/* for RK3588 */
-			rt_uint32_t m;
-			rt_uint32_t p;
-			rt_uint32_t s;
-			rt_uint32_t k;
-		};
-	};
-};
+    rt_ubase_t rate;
+    rt_uint32_t nr;
+    rt_uint32_t nf;
+    rt_uint32_t no;
+    rt_uint32_t nb;
 
-enum rk_pll_type {
-	pll_rk3036,
-	pll_rk3066,
-	pll_rk3328,
-	pll_rk3366,
-	pll_rk3399,
-	pll_rk3588,
+    rt_uint32_t fbdiv;
+    rt_uint32_t postdiv1;
+    rt_uint32_t refdiv;
+    rt_uint32_t postdiv2;
+    rt_uint32_t dsmpd;
+    rt_uint32_t frac;
 };
-
-typedef rt_uint32_t rk_pll_type_t;
 
 struct rk_pll_clock
 {
@@ -78,7 +53,6 @@ struct rk_pll_clock
     rt_uint32_t mode_offset;
     rt_uint32_t mode_shift;
     rt_uint32_t lock_shift;
-    rk_pll_type_t type;
     rt_uint32_t pll_flags;
     struct rk_pll_rate_table *rate_table;
     rt_uint32_t mode_mask;
@@ -112,31 +86,21 @@ _pname, _con_idx, _con_bit) \
     .pclk_div = _pclk_div,  \
 }
 
-#define RK3036_PLL_RATE(_rate, _refdiv, _fbdiv,    \
+#define PLL_RATE(_rate, _refdiv, _fbdiv,    \
     _postdiv1, _postdiv2, _dsmpd, _frac)    \
 {                                           \
     .rate     = _rate##U,                   \
-    .fbdiv    = _fbdiv,       \
-    .postdiv1 = _postdiv1,    \
-    .refdiv   = _refdiv,      \
-    .postdiv2 = _postdiv2,    \
-    .dsmpd    = _dsmpd,       \
-    .frac     = _frac,        \
+    .fbdiv    = _fbdiv,                     \
+    .postdiv1 = _postdiv1,                  \
+    .refdiv   = _refdiv,                    \
+    .postdiv2 = _postdiv2,                  \
+    .dsmpd    = _dsmpd,                     \
+    .frac     = _frac,                      \
 }
 
-#define RK3588_PLL_RATE(_rate, _p, _m, _s, _k)  \
-{								                \
-	.rate	= _rate##U,					        \
-	.p = _p,						\
-	.m = _m,						\
-	.s = _s,						\
-	.k = _k,						\
-}
-
-#define PLL(_type, _id, _con, _mode, _mshift,  \
+#define PLL(_id, _con, _mode, _mshift,  \
     _lshift, _pflags, _rtable)          \
 {                                       \
-    .type        = _type,               \
     .id          = _id,                 \
     .con_offset  = _con,                \
     .mode_offset = _mode,               \
@@ -149,8 +113,5 @@ _pname, _con_idx, _con_bit) \
 #define DIV_TO_RATE(input_rate, div)    ((input_rate) / ((div) + 1))
 
 #define ROCKCHIP_SOFTRST_HIWORD_MASK    RT_BIT(0)
-
-rt_err_t rk_register_softrst(struct rt_reset_controller *rstcer,
-        struct rt_ofw_node *np, void *regs, rt_uint8_t flags);
 
 #endif /* __ROCKCHIP_CLK_H__ */

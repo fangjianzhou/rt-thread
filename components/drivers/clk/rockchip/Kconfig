@@ -1,6 +1,11 @@
+menuconfig RT_CLK_ROCKCHIP_RK8XX_CLKOUT
+    bool "Clock driver for RK805/RK808/RK809/RK817/RK818"
+    depends on RT_MFD_RK8XX
+    select RT_USING_OFW
+    default n
+
 menuconfig RT_CLK_ROCKCHIP
     bool "Rockchip clock controller common"
-    depends on RT_USING_CLK
     select RT_USING_OFW
     select RT_USING_RESET
     default n

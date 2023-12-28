@@ -180,6 +180,9 @@ extern "C" {
 #endif
 
 #ifdef RT_USING_FIRMWARE
+#ifdef RT_FIRMWARE_ARM_SCMI
+#include "drivers/scmi.h"
+#endif
 #ifdef RT_FIRMWARE_PSCI
 #include "drivers/psci.h"
 #endif

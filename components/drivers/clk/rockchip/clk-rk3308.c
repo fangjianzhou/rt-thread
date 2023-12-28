@@ -341,50 +341,50 @@ enum
 
 static struct rk_pll_rate_table pll_rates[] =
 {
-    /* _mhz, _rt_refdiv, _fbdiv, _postdiv1, _postdiv2, _dsmpd, _frac */
-    RK3036_PLL_RATE(1608000000, 1,   67, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1584000000, 1,   66, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1560000000, 1,   65, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1536000000, 1,   64, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1512000000, 1,   63, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1488000000, 1,   62, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1464000000, 1,   61, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1440000000, 1,   60, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1416000000, 1,   59, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1392000000, 1,   58, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1368000000, 1,   57, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1344000000, 1,   56, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1320000000, 1,   55, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1296000000, 1,   54, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1272000000, 1,   53, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1248000000, 1,   52, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1200000000, 1,   50, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1188000000, 2,   99, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1104000000, 1,   46, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1100000000, 12, 550, 1, 1, 1, 0),
-    RK3036_PLL_RATE(1008000000, 1,   84, 2, 1, 1, 0),
-    RK3036_PLL_RATE(1000000000, 6,  500, 2, 1, 1, 0),
-    RK3036_PLL_RATE(984000000,  1,   82, 2, 1, 1, 0),
-    RK3036_PLL_RATE(960000000,  1,   80, 2, 1, 1, 0),
-    RK3036_PLL_RATE(936000000,  1,   78, 2, 1, 1, 0),
-    RK3036_PLL_RATE(912000000,  1,   76, 2, 1, 1, 0),
-    RK3036_PLL_RATE(900000000,  4,  300, 2, 1, 1, 0),
-    RK3036_PLL_RATE(888000000,  1,   74, 2, 1, 1, 0),
-    RK3036_PLL_RATE(864000000,  1,   72, 2, 1, 1, 0),
-    RK3036_PLL_RATE(840000000,  1,   70, 2, 1, 1, 0),
-    RK3036_PLL_RATE(816000000,  1,   68, 2, 1, 1, 0),
-    RK3036_PLL_RATE(800000000,  6,  400, 2, 1, 1, 0),
-    RK3036_PLL_RATE(700000000,  6,  350, 2, 1, 1, 0),
-    RK3036_PLL_RATE(696000000,  1,   58, 2, 1, 1, 0),
-    RK3036_PLL_RATE(624000000,  1,   52, 2, 1, 1, 0),
-    RK3036_PLL_RATE(600000000,  1,   75, 3, 1, 1, 0),
-    RK3036_PLL_RATE(594000000,  2,   99, 2, 1, 1, 0),
-    RK3036_PLL_RATE(504000000,  1,   63, 3, 1, 1, 0),
-    RK3036_PLL_RATE(500000000,  6,  250, 2, 1, 1, 0),
-    RK3036_PLL_RATE(408000000,  1,   68, 2, 2, 1, 0),
-    RK3036_PLL_RATE(312000000,  1,   52, 2, 2, 1, 0),
-    RK3036_PLL_RATE(216000000,  1,   72, 4, 2, 1, 0),
-    RK3036_PLL_RATE(96000000,   1,   64, 4, 4, 1, 0),
+    /* _mhz, _refdiv, _fbdiv, _postdiv1, _postdiv2, _dsmpd, _frac */
+    PLL_RATE(1608000000, 1,   67, 1, 1, 1, 0),
+    PLL_RATE(1584000000, 1,   66, 1, 1, 1, 0),
+    PLL_RATE(1560000000, 1,   65, 1, 1, 1, 0),
+    PLL_RATE(1536000000, 1,   64, 1, 1, 1, 0),
+    PLL_RATE(1512000000, 1,   63, 1, 1, 1, 0),
+    PLL_RATE(1488000000, 1,   62, 1, 1, 1, 0),
+    PLL_RATE(1464000000, 1,   61, 1, 1, 1, 0),
+    PLL_RATE(1440000000, 1,   60, 1, 1, 1, 0),
+    PLL_RATE(1416000000, 1,   59, 1, 1, 1, 0),
+    PLL_RATE(1392000000, 1,   58, 1, 1, 1, 0),
+    PLL_RATE(1368000000, 1,   57, 1, 1, 1, 0),
+    PLL_RATE(1344000000, 1,   56, 1, 1, 1, 0),
+    PLL_RATE(1320000000, 1,   55, 1, 1, 1, 0),
+    PLL_RATE(1296000000, 1,   54, 1, 1, 1, 0),
+    PLL_RATE(1272000000, 1,   53, 1, 1, 1, 0),
+    PLL_RATE(1248000000, 1,   52, 1, 1, 1, 0),
+    PLL_RATE(1200000000, 1,   50, 1, 1, 1, 0),
+    PLL_RATE(1188000000, 2,   99, 1, 1, 1, 0),
+    PLL_RATE(1104000000, 1,   46, 1, 1, 1, 0),
+    PLL_RATE(1100000000, 12, 550, 1, 1, 1, 0),
+    PLL_RATE(1008000000, 1,   84, 2, 1, 1, 0),
+    PLL_RATE(1000000000, 6,  500, 2, 1, 1, 0),
+    PLL_RATE(984000000,  1,   82, 2, 1, 1, 0),
+    PLL_RATE(960000000,  1,   80, 2, 1, 1, 0),
+    PLL_RATE(936000000,  1,   78, 2, 1, 1, 0),
+    PLL_RATE(912000000,  1,   76, 2, 1, 1, 0),
+    PLL_RATE(900000000,  4,  300, 2, 1, 1, 0),
+    PLL_RATE(888000000,  1,   74, 2, 1, 1, 0),
+    PLL_RATE(864000000,  1,   72, 2, 1, 1, 0),
+    PLL_RATE(840000000,  1,   70, 2, 1, 1, 0),
+    PLL_RATE(816000000,  1,   68, 2, 1, 1, 0),
+    PLL_RATE(800000000,  6,  400, 2, 1, 1, 0),
+    PLL_RATE(700000000,  6,  350, 2, 1, 1, 0),
+    PLL_RATE(696000000,  1,   58, 2, 1, 1, 0),
+    PLL_RATE(624000000,  1,   52, 2, 1, 1, 0),
+    PLL_RATE(600000000,  1,   75, 3, 1, 1, 0),
+    PLL_RATE(594000000,  2,   99, 2, 1, 1, 0),
+    PLL_RATE(504000000,  1,   63, 3, 1, 1, 0),
+    PLL_RATE(500000000,  6,  250, 2, 1, 1, 0),
+    PLL_RATE(408000000,  1,   68, 2, 2, 1, 0),
+    PLL_RATE(312000000,  1,   52, 2, 2, 1, 0),
+    PLL_RATE(216000000,  1,   72, 4, 2, 1, 0),
+    PLL_RATE(96000000,   1,   64, 4, 4, 1, 0),
 };
 
 static struct rk_cpu_rate_table cpu_rates[] =
@@ -410,10 +410,10 @@ static struct rk_cpu_rate_table cpu_rates[] =
 
 static struct rk_pll_clock pll_clks[] =
 {
-    [apll]  = PLL(pll_rk3328, PLL_APLL,  PLL_CON(0),  MODE_CON, 0, 10, 0, pll_rates),
-    [dpll]  = PLL(pll_rk3328, PLL_DPLL,  PLL_CON(8),  MODE_CON, 2, 10, 0, RT_NULL),
-    [vpll0] = PLL(pll_rk3328, PLL_VPLL0, PLL_CON(16), MODE_CON, 4, 10, 0, RT_NULL),
-    [vpll1] = PLL(pll_rk3328, PLL_VPLL1, PLL_CON(24), MODE_CON, 6, 10, 0, RT_NULL),
+    [apll]  = PLL(PLL_APLL,  PLL_CON(0),  MODE_CON, 0, 10, 0, pll_rates),
+    [dpll]  = PLL(PLL_DPLL,  PLL_CON(8),  MODE_CON, 2, 10, 0, RT_NULL),
+    [vpll0] = PLL(PLL_VPLL0, PLL_CON(16), MODE_CON, 4, 10, 0, RT_NULL),
+    [vpll1] = PLL(PLL_VPLL1, PLL_CON(24), MODE_CON, 6, 10, 0, RT_NULL),
 };
 
 static struct rk_clk_gate clk_gates[] =
@@ -472,13 +472,13 @@ static struct rk_clk_gate clk_gates[] =
     GATE(SCLK_SFC, "clk_sfc", RT_NULL, 8, 12),
     GATE(SCLK_OTG_ADP, "clk_otg_adp", "clk_rtc32k", 8, 13),
     GATE(SCLK_MAC_SRC, "clk_mac_src", RT_NULL, 8, 14),
-    GATE(SCLK_MAC_REF, "clk_mac_rt_ref", "clk_mac", 9, 1),
+    GATE(SCLK_MAC_REF, "clk_mac_ref", "clk_mac", 9, 1),
     GATE(SCLK_MAC_RX_TX, "clk_mac_rx_tx", "clk_mac", 9, 0),
     GATE(SCLK_OWIRE, "clk_owire", RT_NULL, 8, 15),
     GATE(SCLK_DDRCLK, "clk_ddrphy4x_src", RT_NULL, 0, 10),
     GATE(PCLK_PMU, "pclk_pmu", "pclk_bus", 4, 5),
     GATE(SCLK_PMU, "clk_pmu", "pclk_bus", 4, 6),
-    GATE(SCLK_USBPHY_REF, "clk_usbphy_rt_ref", RT_NULL, 4, 8),
+    GATE(SCLK_USBPHY_REF, "clk_usbphy_ref", RT_NULL, 4, 8),
     GATE(SCLK_WIFI, "clk_wifi", RT_NULL, 4, 1),
     GATE(SCLK_PVTM_PMU, "clk_pvtm_pmu", "xin24m", 4, 4),
     GATE(HCLK_AUDIO, "hclk_audio", "clk_audio_src", 10, 1),
@@ -586,6 +586,7 @@ static struct rk_clk_gate clk_gates[] =
 
 #define PLL_MODE_MASK   0x1
 #include "clk-pll.c"
+#include "clk-mmc-phase.c"
 #include "softrst.c"
 
 static rt_base_t armclk_set_clk(struct rk_clk_priv *priv, rt_ubase_t hz)
@@ -607,10 +608,10 @@ static rt_base_t armclk_set_clk(struct rk_clk_priv *priv, rt_ubase_t hz)
      * set up dependent divisors for PERI and ACLK clocks.
      * core hz : apll = 1:1
      */
-    old_rate = rk_pll_get_rate(&pll_clks[apll], priv->cru, apll);
+    old_rate = rk_pll_get_rate(&pll_clks[apll], priv->cru);
     if (old_rate > hz)
     {
-        if (rk_pll_set_rate(&pll_clks[apll], priv->cru, apll, hz))
+        if (rk_pll_set_rate(&pll_clks[apll], priv->cru, hz))
         {
             return -RT_EINVAL;
         }
@@ -633,30 +634,30 @@ static rt_base_t armclk_set_clk(struct rk_clk_priv *priv, rt_ubase_t hz)
                 CORE_CLK_PLL_SEL_APLL << CORE_CLK_PLL_SEL_SHIFT |
                 0 << CORE_DIV_CON_SHIFT);
 
-        if (rk_pll_set_rate(&pll_clks[apll], priv->cru, apll, hz))
+        if (rk_pll_set_rate(&pll_clks[apll], priv->cru, hz))
         {
             return -RT_EINVAL;
         }
     }
 
-    return rk_pll_get_rate(&pll_clks[apll], priv->cru, apll);
+    return rk_pll_get_rate(&pll_clks[apll], priv->cru);
 }
 
 static void clk_get_pll_rate(struct rk_clk_priv *priv)
 {
     if (!priv->dpll_hz)
     {
-        priv->dpll_hz = rk_pll_get_rate(&pll_clks[dpll], priv->cru, dpll);
+        priv->dpll_hz = rk_pll_get_rate(&pll_clks[dpll], priv->cru);
     }
 
     if (!priv->vpll0_hz)
     {
-        priv->vpll0_hz = rk_pll_get_rate(&pll_clks[vpll0], priv->cru, vpll0);
+        priv->vpll0_hz = rk_pll_get_rate(&pll_clks[vpll0], priv->cru);
     }
 
     if (!priv->vpll1_hz)
     {
-        priv->vpll1_hz = rk_pll_get_rate(&pll_clks[vpll1], priv->cru, vpll1);
+        priv->vpll1_hz = rk_pll_get_rate(&pll_clks[vpll1], priv->cru);
     }
 }
 
@@ -732,15 +733,15 @@ static rt_base_t mac_set_clk(struct rk_clk_priv *priv, rt_ubase_t clk_id, rt_uba
 
     if ((con >> MAC_PLL_SHIFT) & MAC_SEL_VPLL0)
     {
-        pll_rate = rk_pll_get_rate(&pll_clks[vpll0], priv->cru, vpll0);
+        pll_rate = rk_pll_get_rate(&pll_clks[vpll0], priv->cru);
     }
     else if ((con >> MAC_PLL_SHIFT) & MAC_SEL_VPLL1)
     {
-        pll_rate = rk_pll_get_rate(&pll_clks[vpll1], priv->cru, vpll1);
+        pll_rate = rk_pll_get_rate(&pll_clks[vpll1], priv->cru);
     }
     else
     {
-        pll_rate = rk_pll_get_rate(&pll_clks[dpll], priv->cru, dpll);
+        pll_rate = rk_pll_get_rate(&pll_clks[dpll], priv->cru);
     }
 
     /* default set 50MHZ for gmac */
@@ -1481,16 +1482,16 @@ static rt_base_t rk_clk_get_rate(struct rk_clk_platform_data *pdata,
     {
     case PLL_APLL:
     case ARMCLK:
-        rate = rk_pll_get_rate(&pll_clks[apll], priv->cru, apll);
+        rate = rk_pll_get_rate(&pll_clks[apll], priv->cru);
         break;
     case PLL_DPLL:
-        rate = rk_pll_get_rate(&pll_clks[dpll], priv->cru, dpll);
+        rate = rk_pll_get_rate(&pll_clks[dpll], priv->cru);
         break;
     case PLL_VPLL0:
-        rate = rk_pll_get_rate(&pll_clks[vpll0], priv->cru, vpll0);
+        rate = rk_pll_get_rate(&pll_clks[vpll0], priv->cru);
         break;
     case PLL_VPLL1:
-        rate = rk_pll_get_rate(&pll_clks[vpll1], priv->cru, vpll1);
+        rate = rk_pll_get_rate(&pll_clks[vpll1], priv->cru);
         break;
     case HCLK_SDMMC:
     case HCLK_EMMC:
@@ -1571,8 +1572,8 @@ static rt_base_t rk_clk_set_rate(struct rk_clk_platform_data *pdata,
     switch (pdata->id)
     {
     case PLL_DPLL:
-        res = rk_pll_set_rate(&pll_clks[dpll], priv->cru, dpll, rate);
-        priv->dpll_hz = rk_pll_get_rate(&pll_clks[dpll], priv->cru, dpll);
+        res = rk_pll_set_rate(&pll_clks[dpll], priv->cru, rate);
+        priv->dpll_hz = rk_pll_get_rate(&pll_clks[dpll], priv->cru);
         break;
     case ARMCLK:
         if (priv->armclk_hz)
@@ -1585,7 +1586,8 @@ static rt_base_t rk_clk_set_rate(struct rk_clk_platform_data *pdata,
     case HCLK_EMMC:
     case SCLK_SDMMC:
     case SCLK_EMMC:
-        res = mmc_set_clk(priv, pdata->id, rate);
+        /* make CIU CLK happy */
+        res = mmc_set_clk(priv, pdata->id, rt_min_t(rt_ubase_t, 48 * MHZ, rate));
         break;
     case SCLK_I2C0:
     case SCLK_I2C1:
@@ -1659,7 +1661,7 @@ static rt_err_t rk_clk_wait_lock(struct rk_clk_platform_data *pdata)
         pllcon = HWREG32(pdata->base + PLL_CON(1));
         rt_hw_us_delay(100);
         ++count;
-    } while (pllcon & RK3036_PLLCON1_LOCK_STATUS && count < 10);
+    } while (pllcon & PLLCON1_LOCK_STATUS && count < 10);
 
     if (count >= 10)
     {
@@ -1691,6 +1693,86 @@ static rt_err_t mac_set_parent(struct rk_clk_platform_data *pdata,
     }
 
     return 0;
+}
+
+static rt_err_t mmc_set_phase(struct rk_clk_platform_data *pdata,
+        struct rk_clk *rk_clk, rt_uint32_t degrees)
+{
+    void *reg;
+    rt_ubase_t rate;
+    struct rk_clk_priv *priv = &rk_clk->clk_info;
+    struct rk_cru *cru = priv->cru;
+
+    rate = rk_clk_get_rate(pdata, rk_clk);
+
+    switch (pdata->id)
+    {
+    case SCLK_SDMMC_DRV:
+        reg = &cru->sdmmc_con[0];
+        break;
+
+    case SCLK_SDMMC_SAMPLE:
+        reg = &cru->sdmmc_con[1];
+        break;
+
+    case SCLK_SDIO_DRV:
+        reg = &cru->sdio_con[0];
+        break;
+
+    case SCLK_SDIO_SAMPLE:
+        reg = &cru->sdio_con[1];
+        break;
+
+    case SCLK_EMMC_DRV:
+        reg = &cru->emmc_con[0];
+        break;
+
+    case SCLK_EMMC_SAMPLE:
+        reg = &cru->emmc_con[1];
+        break;
+    }
+
+    return rk_clk_mmc_set_phase(rate, reg, 1, degrees);
+}
+
+static rt_base_t mmc_get_phase(struct rk_clk_platform_data *pdata,
+        struct rk_clk *rk_clk)
+{
+    void *reg;
+    rt_ubase_t rate;
+    struct rk_clk_priv *priv = &rk_clk->clk_info;
+    struct rk_cru *cru = priv->cru;
+
+    rate = rk_clk_get_rate(pdata, rk_clk);
+
+    switch (pdata->id)
+    {
+    case SCLK_SDMMC_DRV:
+        reg = &cru->sdmmc_con[0];
+        break;
+
+    case SCLK_SDMMC_SAMPLE:
+        reg = &cru->sdmmc_con[1];
+        break;
+
+    case SCLK_SDIO_DRV:
+        reg = &cru->sdio_con[0];
+        break;
+
+    case SCLK_SDIO_SAMPLE:
+        reg = &cru->sdio_con[1];
+        break;
+
+    case SCLK_EMMC_DRV:
+        reg = &cru->emmc_con[0];
+        break;
+
+    case SCLK_EMMC_SAMPLE:
+        reg = &cru->emmc_con[1];
+        break;
+    }
+
+    return rk_clk_mmc_get_phase(rate, reg, 1);
 }
 
 static rt_err_t rk3308_clk_init(struct rt_clk *clk, void *fw_data)
@@ -1728,7 +1810,7 @@ static rt_err_t rk3308_clk_init(struct rt_clk *clk, void *fw_data)
     pdata->base = (void *)reg_base;
 
     clk->rate = rk_clk_get_rate(pdata, rk_clk);
-    clk->sysdata = pdata;
+    clk->priv = pdata;
 
     rk_clk_set_default_rates(clk, clk->clk_np->ops->set_rate, clk_id);
 
@@ -1737,13 +1819,13 @@ static rt_err_t rk3308_clk_init(struct rt_clk *clk, void *fw_data)
 
 static rt_err_t rk3308_clk_enable(struct rt_clk *clk)
 {
-    struct rk_clk_platform_data *pdata = clk->sysdata;
+    struct rk_clk_platform_data *pdata = clk->priv;
     struct rk_clk *rk_clk = raw_to_rk_clk(clk->clk_np);
     struct rk_cru *cru = rk_clk->clk_info.cru;
 
     if (pdata->base)
     {
-        HWREG32(pdata->base + PLL_CON(1)) = HIWORD_UPDATE(0, RK3036_PLLCON1_PWRDOWN, 0);
+        HWREG32(pdata->base + PLL_CON(1)) = HIWORD_UPDATE(0, PLLCON1_PWRDOWN, 0);
 
         rk_clk_wait_lock(pdata);
     }
@@ -1759,13 +1841,13 @@ static rt_err_t rk3308_clk_enable(struct rt_clk *clk)
 
 static void rk3308_clk_disable(struct rt_clk *clk)
 {
-    struct rk_clk_platform_data *pdata = clk->sysdata;
+    struct rk_clk_platform_data *pdata = clk->priv;
     struct rk_clk *rk_clk = raw_to_rk_clk(clk->clk_np);
     struct rk_cru *cru = rk_clk->clk_info.cru;
 
     if (pdata->base)
     {
-        HWREG32(pdata->base + PLL_CON(1)) = HIWORD_UPDATE(RK3036_PLLCON1_PWRDOWN, RK3036_PLLCON1_PWRDOWN, 0);
+        HWREG32(pdata->base + PLL_CON(1)) = HIWORD_UPDATE(PLLCON1_PWRDOWN, PLLCON1_PWRDOWN, 0);
     }
     else
     {
@@ -1777,13 +1859,13 @@ static void rk3308_clk_disable(struct rt_clk *clk)
 
 static rt_bool_t rk3308_clk_is_enabled(struct rt_clk *clk)
 {
-    struct rk_clk_platform_data *pdata = clk->sysdata;
+    struct rk_clk_platform_data *pdata = clk->priv;
 
     if (pdata->base)
     {
         rt_uint32_t pllcon = HWREG32(pdata->base + PLL_CON(1));
 
-        return !(pllcon & RK3036_PLLCON1_PWRDOWN);
+        return !(pllcon & PLLCON1_PWRDOWN);
     }
 
     return RT_TRUE;
@@ -1792,7 +1874,7 @@ static rt_bool_t rk3308_clk_is_enabled(struct rt_clk *clk)
 static rt_err_t rk3308_clk_set_rate(struct rt_clk *clk, rt_ubase_t rate, rt_ubase_t parent_rate)
 {
     rt_ubase_t res_rate;
-    struct rk_clk_platform_data *pdata = clk->sysdata;
+    struct rk_clk_platform_data *pdata = clk->priv;
     struct rk_clk *rk_clk = raw_to_rk_clk(clk->clk_np);
 
     res_rate = rk_clk_set_rate(pdata, rk_clk, rate);
@@ -1807,7 +1889,7 @@ static rt_err_t rk3308_clk_set_rate(struct rt_clk *clk, rt_ubase_t rate, rt_ubas
 
 static rt_err_t rk3308_clk_set_parent(struct rt_clk *clk, struct rt_clk *parent)
 {
-    struct rk_clk_platform_data *pdata = clk->sysdata, *ppdata = parent->sysdata;
+    struct rk_clk_platform_data *pdata = clk->priv, *ppdata = parent->priv;
     struct rk_clk *rk_clk = raw_to_rk_clk(clk->clk_np);
 
     switch (pdata->id)
@@ -1822,6 +1904,60 @@ static rt_err_t rk3308_clk_set_parent(struct rt_clk *clk, struct rt_clk *parent)
     return -RT_EINVAL;
 }
 
+static rt_err_t rk3308_clk_set_phase(struct rt_clk *clk, int degrees)
+{
+    rt_err_t res;
+    struct rk_clk_platform_data *pdata = clk->priv;
+    struct rk_clk *rk_clk = raw_to_rk_clk(clk->clk_np);
+
+    switch (pdata->id)
+    {
+    case SCLK_EMMC_SAMPLE:
+    case SCLK_SDMMC_SAMPLE:
+    case SCLK_SDIO_SAMPLE:
+    case SCLK_SDMMC_DRV:
+    case SCLK_EMMC_DRV:
+    case SCLK_SDIO_DRV:
+        res = mmc_set_phase(pdata, rk_clk, degrees);
+        break;
+
+    default:
+        return -RT_EINVAL;
+    }
+
+    return res;
+}
+
+static rt_base_t rk3308_clk_get_phase(struct rt_clk *clk)
+{
+    rt_base_t res;
+    struct rk_clk_platform_data *pdata = clk->priv;
+    struct rk_clk *rk_clk = raw_to_rk_clk(clk->clk_np);
+
+    switch (pdata->id)
+    {
+    case SCLK_EMMC_SAMPLE:
+    case SCLK_SDMMC_SAMPLE:
+    case SCLK_SDIO_SAMPLE:
+    case SCLK_SDMMC_DRV:
+    case SCLK_EMMC_DRV:
+    case SCLK_SDIO_DRV:
+        res = mmc_get_phase(pdata, rk_clk);
+        break;
+
+    default:
+        return -RT_EINVAL;
+    }
+
+    return res;
+}
+
+static rt_base_t rk3308_clk_round_rate(struct rt_clk *clk, rt_ubase_t drate,
+        rt_ubase_t *prate)
+{
+    return rk_clk_pll_round_rate(pll_rates, RT_ARRAY_SIZE(pll_rates), drate, prate);
+}
+
 static const struct rt_clk_ops rk3308_clk_ops =
 {
     .init = rk3308_clk_init,
@@ -1830,6 +1966,9 @@ static const struct rt_clk_ops rk3308_clk_ops =
     .is_enabled = rk3308_clk_is_enabled,
     .set_rate = rk3308_clk_set_rate,
     .set_parent = rk3308_clk_set_parent,
+    .set_phase = rk3308_clk_set_phase,
+    .get_phase = rk3308_clk_get_phase,
+    .round_rate = rk3308_clk_round_rate,
 };
 
 static void rk3308_clk_type_init(struct rk_clk *rk_clk, struct rt_ofw_node *np)
@@ -1845,7 +1984,7 @@ static void rk3308_clk_type_init(struct rk_clk *rk_clk, struct rt_ofw_node *np)
         cpu_freq = atol(rockchip_cpu_freq);
     }
 
-    if (rk_pll_get_rate(&pll_clks[apll], priv->cru, apll) != cpu_freq)
+    if (rk_pll_get_rate(&pll_clks[apll], priv->cru) != cpu_freq)
     {
         if (armclk_set_clk(priv, cpu_freq) < 0)
         {

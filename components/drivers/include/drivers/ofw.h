@@ -50,7 +50,7 @@ struct rt_ofw_node
     struct rt_ofw_node *child;
     struct rt_ofw_node *sibling;
 
-    struct rt_ref rt_ref;
+    struct rt_ref ref;
 
 #define RT_OFW_F_SYSTEM         0   /* node is system node */
 #define RT_OFW_F_READLY         1   /* node has driver */
@@ -87,7 +87,7 @@ struct rt_ofw_node_id
     /*
      * The compatible string should consist only of lowercase letters, digits
      * and dashes, and should start with a letter. A single comma is typically
-     * only used following a vendor prt_refix. Underscores should not be used.
+     * only used following a vendor prefix. Underscores should not be used.
      */
     char compatible[128];
 
@@ -150,7 +150,7 @@ struct rt_ofw_node *rt_ofw_node_get(struct rt_ofw_node *np);
 void rt_ofw_node_put(struct rt_ofw_node *np);
 
 rt_bool_t rt_ofw_node_tag_equ(const struct rt_ofw_node *np, const char *tag);
-rt_bool_t rt_ofw_node_tag_prt_refix(const struct rt_ofw_node *np, const char *prt_refix);
+rt_bool_t rt_ofw_node_tag_prefix(const struct rt_ofw_node *np, const char *prefix);
 
 rt_inline const char *rt_ofw_node_name(const struct rt_ofw_node *np)
 {
@@ -212,6 +212,9 @@ rt_uint64_t rt_ofw_get_cpu_hwid(struct rt_ofw_node *cpu_np, unsigned int thread)
 struct rt_ofw_node *rt_ofw_get_alias_node(const char *tag, int id);
 int rt_ofw_get_alias_id(struct rt_ofw_node *np, const char *tag);
 int rt_ofw_get_alias_last_id(const char *tag);
+
+struct rt_ofw_node *rt_ofw_append_child(struct rt_ofw_node *parent, const char *full_name);
+rt_err_t rt_ofw_append_prop(struct rt_ofw_node *np, const char *name, int length, void *value);
 
 struct rt_ofw_node *rt_ofw_parse_phandle(const struct rt_ofw_node *np, const char *phandle_name, int index);
 rt_err_t rt_ofw_parse_phandle_cells(const struct rt_ofw_node *np, const char *list_name, const char *cells_name,

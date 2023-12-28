@@ -1313,6 +1313,9 @@ rt_err_t rt_hw_serial_register(struct rt_serial_device *serial,
     device->fops        = &_serial_fops;
 #endif
 
+#if defined(RT_USING_SMART)
+rt_hw_serial_register_tty(serial);
+#endif
     return ret;
 }
 

@@ -10,11 +10,13 @@
 
 #include <rtthread.h>
 #include <rtservice.h>
-#include <rtdevice.h>
 
 #define DBG_TAG "rtdm.clk"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
+
+#include <drivers/clk.h>
+#include <drivers/core/rtdm.h>
 
 static struct rt_spinlock _clk_lock = { 0 };
 static rt_list_t _clk_nodes = RT_LIST_OBJECT_INIT(_clk_nodes);
@@ -887,7 +889,6 @@ void rt_clk_put(struct rt_clk *clk)
 }
 
 #ifdef RT_USING_OFW
-rt_ssize_t rt_ofw_count_of_clk(struct rt_ofw_node *clk_ofw_np);
 static struct rt_clk *ofw_get_clk_no_lock(struct rt_ofw_node *np, int index, const char *name)
 {
     struct rt_clk *clk = RT_NULL;

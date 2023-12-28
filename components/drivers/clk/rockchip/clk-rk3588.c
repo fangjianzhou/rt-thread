@@ -49,17 +49,17 @@ struct rk3588_pll {
 };
 
 struct rk3588_cru {
-	struct rk3588_pll pll[18];
-	unsigned int reserved0[16];/* Address Offset: 0x0240 */
-	unsigned int mode_con00;/* Address Offset: 0x0280 */
-	unsigned int reserved1[31];/* Address Offset: 0x0284 */
-	unsigned int clksel_con[178]; /* Address Offset: 0x0300 */
-	unsigned int reserved2[142];/* Address Offset: 0x05c8 */
-	unsigned int clkgate_con[78];/* Address Offset: 0x0800 */
-	unsigned int reserved3[50];/* Address Offset: 0x0938 */
-	unsigned int softrst_con[78];/* Address Offset: 0xa00 */ // for convenient of softrst register
-	unsigned int reserved4[50];/* Address Offset: 0x0b38 */
-	unsigned int glb_cnt_th;/* Address Offset: 0x0c00 */
+	struct rk3588_pll pll[18];																			//144
+	unsigned int reserved0[16];/* Address Offset: 0x0240 */												//160
+	unsigned int mode_con00;/* Address Offset: 0x0280 */												//161
+	unsigned int reserved1[31];/* Address Offset: 0x0284 */												//192
+	unsigned int clksel_con[178]; /* Address Offset: 0x0300 */											//370
+	unsigned int reserved2[142];/* Address Offset: 0x05c8 */											//512
+	unsigned int clkgate_con[78];/* Address Offset: 0x0800 */											//590
+	unsigned int reserved3[50];/* Address Offset: 0x0938 */												//640
+	unsigned int softrst_con[78];/* Address Offset: 0xa00 */ // for convenient of softrst register		//718
+	unsigned int reserved4[50];/* Address Offset: 0x0b38 */												//768
+	unsigned int glb_cnt_th;/* Address Offset: 0x0c00 */												//
 	unsigned int glb_rst_st;/* Address Offset: 0x0c04 */
 	unsigned int glb_srst_fst;/* Address Offset: 0x0c08 */
 	unsigned int glb_srsr_snd; /* Address Offset: 0x0c0c */
@@ -818,9 +818,9 @@ static struct rk3588_clk_gate clk_gates[] =
 	GATE(CLK_PCIE_AUX2, "clk_pcie_aux2", "xin24m", RK3588_CLKGATE_CON(34), 3),
 	GATE(CLK_PCIE_AUX3, "clk_pcie_aux3", "xin24m", RK3588_CLKGATE_CON(34), 4),
 	GATE(CLK_PCIE_AUX4, "clk_pcie_aux4", "xin24m", RK3588_CLKGATE_CON(34), 5),
-	GATE(CLK_PIPEPHY0_REF, "clk_pipephy0_rt_ref", "xin24m", RK3588_CLKGATE_CON(37), 0),
-	GATE(CLK_PIPEPHY1_REF, "clk_pipephy1_rt_ref", "xin24m", RK3588_CLKGATE_CON(37), 1),
-	GATE(CLK_PIPEPHY2_REF, "clk_pipephy2_rt_ref", "xin24m", RK3588_CLKGATE_CON(37), 2),
+	GATE(CLK_PIPEPHY0_REF, "clk_pipephy0_ref", "xin24m", RK3588_CLKGATE_CON(37), 0),
+	GATE(CLK_PIPEPHY1_REF, "clk_pipephy1_ref", "xin24m", RK3588_CLKGATE_CON(37), 1),
+	GATE(CLK_PIPEPHY2_REF, "clk_pipephy2_ref", "xin24m", RK3588_CLKGATE_CON(37), 2),
 	GATE(PCLK_GMAC0, "pclk_gmac0", "pclk_php_root", RK3588_CLKGATE_CON(32), 3),
 	GATE(PCLK_GMAC1, "pclk_gmac1", "pclk_php_root", RK3588_CLKGATE_CON(32), 4),
 	GATE(ACLK_GMAC0, "aclk_gmac0", "aclk_mmu_php", RK3588_CLKGATE_CON(32), 10),
@@ -833,7 +833,7 @@ static struct rk3588_clk_gate clk_gates[] =
 	GATE(ACLK_SATA2, "aclk_sata2", "aclk_mmu_php", RK3588_CLKGATE_CON(37), 9),
 	GATE(ACLK_USB3OTG2, "aclk_usb3otg2", "aclk_mmu_php", RK3588_CLKGATE_CON(35), 7),
 	GATE(SUSPEND_CLK_USB3OTG2, "suspend_clk_usb3otg2", "xin24m", RK3588_CLKGATE_CON(35), 8),
-	GATE(REF_CLK_USB3OTG2, "rt_ref_clk_usb3otg2", "xin24m", RK3588_CLKGATE_CON(35), 9),
+	GATE(REF_CLK_USB3OTG2, "ref_clk_usb3otg2", "xin24m", RK3588_CLKGATE_CON(35), 9),
 	GATE(PCLK_PCIE_COMBO_PIPE_PHY0, "pclk_pcie_combo_pipe_phy0", "pclk_top_root", RK3588_PHP_CLKGATE_CON(0), 5),
 	GATE(PCLK_PCIE_COMBO_PIPE_PHY1, "pclk_pcie_combo_pipe_phy1", "pclk_top_root", RK3588_PHP_CLKGATE_CON(0), 6),
 	GATE(PCLK_PCIE_COMBO_PIPE_PHY2, "pclk_pcie_combo_pipe_phy2", "pclk_top_root", RK3588_PHP_CLKGATE_CON(0), 7),
@@ -845,9 +845,9 @@ static struct rk3588_clk_gate clk_gates[] =
 
 	/* vdec */
 	GATE(SUSPEND_CLK_USB3OTG0, "suspend_clk_usb3otg0", "xin24m", RK3588_CLKGATE_CON(42), 5),
-	GATE(REF_CLK_USB3OTG0, "rt_ref_clk_usb3otg0", "xin24m", RK3588_CLKGATE_CON(42), 6),
+	GATE(REF_CLK_USB3OTG0, "ref_clk_usb3otg0", "xin24m", RK3588_CLKGATE_CON(42), 6),
 	GATE(SUSPEND_CLK_USB3OTG1, "suspend_clk_usb3otg1", "xin24m", RK3588_CLKGATE_CON(42), 8),
-	GATE(REF_CLK_USB3OTG1, "rt_ref_clk_usb3otg1", "xin24m", RK3588_CLKGATE_CON(42), 9),
+	GATE(REF_CLK_USB3OTG1, "ref_clk_usb3otg1", "xin24m", RK3588_CLKGATE_CON(42), 9),
 
 	/* vdpu */
 	GATE(HCLK_IEP2P0, "hclk_iep2p0", "hclk_vdpu_root", RK3588_CLKGATE_CON(45), 4),
@@ -914,12 +914,12 @@ static struct rk3588_clk_gate clk_gates[] =
 	GATE(PCLK_HDCP1, "pclk_hdcp1", "pclk_vo1_root", RK3588_CLKGATE_CON(60), 7),
 	GATE(ACLK_HDMIRX, "aclk_hdmirx", "aclk_hdmirx_root", RK3588_CLKGATE_CON(61), 9),
 	GATE(PCLK_HDMIRX, "pclk_hdmirx", "pclk_vo1_root", RK3588_CLKGATE_CON(61), 10),
-	GATE(CLK_HDMIRX_REF, "clk_hdmirx_rt_ref", "aclk_hdcp1_root", RK3588_CLKGATE_CON(61), 11),
+	GATE(CLK_HDMIRX_REF, "clk_hdmirx_ref", "aclk_hdcp1_root", RK3588_CLKGATE_CON(61), 11),
 	GATE(CLK_HDMIRX_AUD, "clk_hdmirx_aud", "clk_hdmirx_aud_mux", RK3588_CLKGATE_CON(61), 14),
 	GATE(PCLK_HDMITX0, "pclk_hdmitx0", "pclk_vo1_root", RK3588_CLKGATE_CON(60), 11),
-	GATE(CLK_HDMITX0_REF, "clk_hdmitx0_rt_ref", "aclk_hdcp1_root", RK3588_CLKGATE_CON(61), 0),
+	GATE(CLK_HDMITX0_REF, "clk_hdmitx0_ref", "aclk_hdcp1_root", RK3588_CLKGATE_CON(61), 0),
 	GATE(PCLK_HDMITX1, "pclk_hdmitx1", "pclk_vo1_root", RK3588_CLKGATE_CON(61), 2),
-	GATE(CLK_HDMITX1_REF, "clk_hdmitx1_rt_ref", "aclk_hdcp1_root", RK3588_CLKGATE_CON(61), 7),
+	GATE(CLK_HDMITX1_REF, "clk_hdmitx1_ref", "aclk_hdcp1_root", RK3588_CLKGATE_CON(61), 7),
 	GATE(ACLK_TRNG1, "aclk_trng1", "aclk_hdcp1_root", RK3588_CLKGATE_CON(60), 9),
 	GATE(PCLK_TRNG1, "pclk_trng1", "pclk_vo1_root", RK3588_CLKGATE_CON(60), 10),
 	GATE(0, "pclk_vo1grf", "pclk_vo1_root", RK3588_CLKGATE_CON(59), 12),
@@ -949,9 +949,9 @@ static struct rk3588_clk_gate clk_gates[] =
 	GATE(CLK_USBDP_PHY0_IMMORTAL, "clk_usbdp_phy0_immortal", "xin24m", RK3588_CLKGATE_CON(2), 8),
 	GATE(CLK_USBDP_PHY1_IMMORTAL, "clk_usbdp_phy1_immortal", "xin24m", RK3588_CLKGATE_CON(2), 15),
 
-	GATE(CLK_REF_PIPE_PHY0_OSC_SRC, "clk_rt_ref_pipe_phy0_osc_src", "xin24m", RK3588_CLKGATE_CON(77), 0),
-	GATE(CLK_REF_PIPE_PHY1_OSC_SRC, "clk_rt_ref_pipe_phy1_osc_src", "xin24m", RK3588_CLKGATE_CON(77), 1),
-	GATE(CLK_REF_PIPE_PHY2_OSC_SRC, "clk_rt_ref_pipe_phy2_osc_src", "xin24m", RK3588_CLKGATE_CON(77), 2),
+	GATE(CLK_REF_PIPE_PHY0_OSC_SRC, "clk_ref_pipe_phy0_osc_src", "xin24m", RK3588_CLKGATE_CON(77), 0),
+	GATE(CLK_REF_PIPE_PHY1_OSC_SRC, "clk_ref_pipe_phy1_osc_src", "xin24m", RK3588_CLKGATE_CON(77), 1),
+	GATE(CLK_REF_PIPE_PHY2_OSC_SRC, "clk_ref_pipe_phy2_osc_src", "xin24m", RK3588_CLKGATE_CON(77), 2),
 
 	/* pmu */
 	GATE(PCLK_PMU0_ROOT, "pclk_pmu0_root", "pclk_pmu1_root", RK3588_PMU_CLKGATE_CON(5), 0),
@@ -979,10 +979,10 @@ static struct rk3588_clk_gate clk_gates[] =
 	GATE(PCLK_UART0, "pclk_uart0", "pclk_pmu0_root", RK3588_PMU_CLKGATE_CON(2), 6),
 	GATE(PCLK_PMU1WDT, "pclk_pmu1wdt", "pclk_pmu0_root", RK3588_PMU_CLKGATE_CON(1), 6),
 #define RK3588_PHYREF_ALT_GATE		0xc38
-	GATE(CLK_PHY0_REF_ALT_P, "clk_phy0_rt_ref_alt_p", "ppll", RK3588_PHYREF_ALT_GATE, 0),
-	GATE(CLK_PHY0_REF_ALT_M, "clk_phy0_rt_ref_alt_m", "ppll", RK3588_PHYREF_ALT_GATE, 1),
-	GATE(CLK_PHY1_REF_ALT_P, "clk_phy1_rt_ref_alt_p", "ppll", RK3588_PHYREF_ALT_GATE, 2),
-	GATE(CLK_PHY1_REF_ALT_M, "clk_phy1_rt_ref_alt_m", "ppll", RK3588_PHYREF_ALT_GATE, 3),
+	GATE(CLK_PHY0_REF_ALT_P, "clk_phy0_ref_alt_p", "ppll", RK3588_PHYREF_ALT_GATE, 0),
+	GATE(CLK_PHY0_REF_ALT_M, "clk_phy0_ref_alt_m", "ppll", RK3588_PHYREF_ALT_GATE, 1),
+	GATE(CLK_PHY1_REF_ALT_P, "clk_phy1_ref_alt_p", "ppll", RK3588_PHYREF_ALT_GATE, 2),
+	GATE(CLK_PHY1_REF_ALT_M, "clk_phy1_ref_alt_m", "ppll", RK3588_PHYREF_ALT_GATE, 3),
 
 	GATE(HCLK_SPDIFRX0, "hclk_spdifrx0", "hclk_vo1", RK3588_CLKGATE_CON(63), 12),
 	GATE(HCLK_SPDIFRX1, "hclk_spdifrx1", "hclk_vo1", RK3588_CLKGATE_CON(63), 14),
@@ -1064,6 +1064,13 @@ static struct rk3588_clk_gate clk_gates[] =
 	GATE(HCLK_SDIO_PRE, "hclk_sdio_pre", "hclk_sdio_root", RK3588_CLKGATE_CON(75), 1),
 */
 };
+
+#include "clk-pll.c"
+#include "clk-mmc-phase.c"
+#include "softrst.c"
+
+
+
 static rt_ubase_t rk3588_center_get_clk(struct rk3588_clk_priv *priv, rt_ubase_t clk_id)
 {
 	struct rk3588_cru *cru = priv->cru;
@@ -2557,6 +2564,70 @@ static rt_ubase_t rk_clk_get_rate(struct rk3588_clk_platform_data *pdata,
 	return rate;
 };
 
+static rt_err_t mmc_set_phase(struct rk3588_clk_platform_data *pdata,
+        struct rk3588_clk *rk_clk, rt_uint32_t degrees)
+{
+    void *reg;
+    rt_ubase_t rate;
+    struct rk3588_clk_priv *priv = &rk_clk->clk_info;
+    struct rk3588_cru *cru = priv->cru;
+
+    rate = rk_clk_get_rate(pdata, rk_clk);
+
+    switch (pdata->id)
+    {
+    case SCLK_SDIO_DRV:
+        reg = &cru->sdio_con[0];
+        break;
+
+    case SCLK_SDIO_SAMPLE:
+        reg = &cru->sdio_con[1];
+        break;
+
+    case SCLK_SDMMC_DRV:
+        reg = &cru->sdmmc_con[0];
+        break;
+
+    case SCLK_SDMMC_SAMPLE:
+        reg = &cru->sdmmc_con[1];
+        break;
+    }
+
+    return rk_clk_mmc_set_phase(rate, reg, 1, degrees);
+}
+
+static rt_base_t mmc_get_phase(struct rk3588_clk_platform_data *pdata,
+        struct rk3588_clk *rk_clk)
+{
+    void *reg;
+    rt_ubase_t rate;
+    struct rk3588_clk_priv *priv = &rk_clk->clk_info;
+    struct rk3588_cru *cru = priv->cru;
+
+    rate = rk_clk_get_rate(pdata, rk_clk);
+
+    switch (pdata->id)
+    {
+    case SCLK_SDIO_DRV:
+        reg = &cru->sdio_con[0];
+        break;
+
+    case SCLK_SDIO_SAMPLE:
+        reg = &cru->sdio_con[1];
+        break;
+
+    case SCLK_SDMMC_DRV:
+        reg = &cru->sdmmc_con[0];
+        break;
+
+    case SCLK_SDMMC_SAMPLE:
+        reg = &cru->sdmmc_con[1];
+        break;
+    }
+
+    return rk_clk_mmc_get_phase(rate, reg, 1);
+}
+
 static rt_err_t rk3588_clk_init(struct rt_clk *clk, void *fw_data)
 {
     struct rk3588_clk *rk_clk = raw_to_rk_clk(clk->clk_np);
@@ -2945,6 +3016,55 @@ static rt_err_t rk3588_clk_set_parent(struct rt_clk *clk, struct rt_clk *parent)
 }
 
 
+static rt_err_t rk3588_clk_set_phase(struct rt_clk *clk, int degrees)
+{
+    rt_err_t res;
+    struct rk3588_clk_platform_data *pdata = clk->priv;
+    struct rk3588_clk *rk_clk = raw_to_rk_clk(clk->clk_np);
+
+    switch (pdata->id)
+    {
+    case SCLK_SDIO_DRV:
+    case SCLK_SDIO_SAMPLE:
+    case SCLK_SDMMC_DRV:
+    case SCLK_SDMMC_SAMPLE:
+        res = mmc_set_phase(pdata, rk_clk, degrees);
+        break;
+
+    default:
+        return -RT_EINVAL;
+    }
+
+    return res;
+}
+
+static rt_base_t rk3588_clk_get_phase(struct rt_clk *clk)
+{
+    rt_base_t res;
+    struct rk3588_clk_platform_data *pdata = clk->priv;
+    struct rk3588_clk *rk_clk = raw_to_rk_clk(clk->clk_np);
+
+    switch (pdata->id)
+    {
+    case SCLK_SDIO_DRV:
+    case SCLK_SDIO_SAMPLE:
+    case SCLK_SDMMC_DRV:
+    case SCLK_SDMMC_SAMPLE:
+        res = mmc_get_phase(pdata, rk_clk);
+        break;
+
+    default:
+        return -RT_EINVAL;
+    }
+
+    return res;
+}
+
+static rt_base_t rk3588_clk_round_rate(struct rt_clk *clk, rt_ubase_t drate,
+        rt_ubase_t *prate)
+{
+    return rk_clk_pll_round_rate(rk3588_pll_rates, RT_ARRAY_SIZE(rk3588_pll_rates), drate, prate);
+}
 
 static const struct rt_clk_ops rk3588_clk_ops =
 {
@@ -2954,6 +3074,9 @@ static const struct rt_clk_ops rk3588_clk_ops =
     .is_enabled = rk3588_clk_is_enabled,
     .set_rate = rk3588_clk_set_rate,
     .set_parent = rk3588_clk_set_parent,
+    .set_phase = rk3588_clk_set_phase,
+    .get_phase = rk3588_clk_get_phase,
+    .round_rate = rk3588_clk_round_rate,
 };
 
 

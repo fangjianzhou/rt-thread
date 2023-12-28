@@ -7,7 +7,7 @@
  * Date           Author       Notes
  * 2022-08-25     GuEe-GUI     first version
  */
-#include <posix/string.h>
+
 #include <rtthread.h>
 #include <rtdevice.h>
 
@@ -118,11 +118,12 @@ static const char *ofw_console_tty_find(char *dst_con, const char *con)
         }
 
         rt_bus_lock(platform_bus);
-
+int c = 0;
         rt_list_for_each_entry(dev, &platform_bus->dev_list, node)
         {
             struct rt_platform_device *pdev = rt_container_of(dev, struct rt_platform_device, parent);
             const struct rt_ofw_node_id *id = pdev->id;
+            c++;
 
             if (id && id->type[0] && !rt_strncmp(id->type, console, tty_name_len))
             {
@@ -142,7 +143,17 @@ static const char *ofw_console_tty_find(char *dst_con, const char *con)
 
     return ofw_name;
 }
-
+static inline void us_delay(unsigned int uicnt)
+{
+    int i, j;
+    for (i = 0; i < uicnt; i++)
+    {
+        for (j = 0; j < 1000; j++)
+        {
+            asm("nop");
+        }
+    }
+}
 rt_err_t rt_ofw_console_setup(void)
 {
     rt_err_t err = -RT_ENOSYS;

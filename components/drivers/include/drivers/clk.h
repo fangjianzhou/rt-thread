@@ -21,6 +21,22 @@ struct rt_reset_control_node;
 
 struct rt_clk_node
 {
+    /*
+     * Defined as the array like this if if the CLK have multi out clocks:
+     *
+     *  struct XYZ_single_clk
+     *  {
+     *      struct rt_clk_node parent;
+     *      ...
+     *  };
+     *
+     *  struct XYZ_multi_clk
+     *  {
+     *      struct rt_clk_node parent[N];
+     *      ...
+     *  };
+     * We assume the 'N' is the max value of element in 'clock-indices' if OFW.
+     */
     rt_list_t list;
     rt_list_t children_nodes;
 
@@ -39,7 +55,7 @@ struct rt_clk_node
     void *priv;
 
     struct rt_clk *clk;
-     rt_size_t multi_clk;
+    rt_size_t multi_clk;
 };
 
 struct rt_clk_fixed_rate
@@ -85,7 +101,6 @@ struct rt_clk_ops
     rt_err_t    (*set_phase)(struct rt_clk *, int degrees);
     rt_base_t   (*get_phase)(struct rt_clk *);
     rt_base_t   (*round_rate)(struct rt_clk *, rt_ubase_t drate, rt_ubase_t *prate);
-
 };
 
 struct rt_clk_notifier;
@@ -138,6 +153,11 @@ rt_err_t rt_clk_set_max_rate(struct rt_clk *clk, rt_ubase_t rate);
 rt_err_t rt_clk_set_rate(struct rt_clk *clk, rt_ubase_t rate);
 rt_ubase_t rt_clk_get_rate(struct rt_clk *clk);
 
+rt_err_t rt_clk_set_phase(struct rt_clk *clk, int degrees);
+rt_base_t rt_clk_get_phase(struct rt_clk *clk);
+
+rt_base_t rt_clk_round_rate(struct rt_clk *clk, rt_ubase_t rate);
+
 struct rt_clk *rt_clk_get_parent(struct rt_clk *clk);
 
 struct rt_clk_array *rt_clk_get_array(struct rt_device *dev);
@@ -150,14 +170,19 @@ void rt_clk_put(struct rt_clk *clk);
 struct rt_clk_array *rt_ofw_get_clk_array(struct rt_ofw_node *np);
 struct rt_clk *rt_ofw_get_clk(struct rt_ofw_node *np, int index);
 struct rt_clk *rt_ofw_get_clk_by_name(struct rt_ofw_node *np, const char *name);
+rt_ssize_t rt_ofw_count_of_clk(struct rt_ofw_node *clk_ofw_np);
 #else
-struct rt_clk *rt_ofw_get_clk(struct rt_ofw_node *np, int index)
+rt_inline struct rt_clk *rt_ofw_get_clk(struct rt_ofw_node *np, int index)
 {
     return RT_NULL;
 }
-struct rt_clk *rt_ofw_get_clk_by_name(struct rt_ofw_node *np, const char *name)
+rt_inline struct rt_clk *rt_ofw_get_clk_by_name(struct rt_ofw_node *np, const char *name)
 {
     return RT_NULL;
+}
+rt_inline rt_ssize_t rt_ofw_count_of_clk(struct rt_ofw_node *clk_ofw_np)
+{
+    return 0;
 }
 #endif /* RT_USING_OFW */
 

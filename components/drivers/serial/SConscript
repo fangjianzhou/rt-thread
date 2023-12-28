@@ -10,7 +10,7 @@ cwd = GetCurrentDir()
 list = os.listdir(cwd)
 CPPPATH = [cwd + '/../include']
 
-src = []
+src = ['serial_tty.c']
 
 if GetDepend(['RT_USING_SERIAL_V2']):
     src += ['serial_v2.c']

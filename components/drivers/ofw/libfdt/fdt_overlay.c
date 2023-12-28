@@ -184,13 +184,13 @@ static int overlay_adjust_local_phandles(void *fdto, uint32_t delta)
 }
 
 /**
- * overlay_update_local_node_rt_references - Adjust the overlay rt_references
+ * overlay_update_local_node_references - Adjust the overlay references
  * @fdto: Device tree overlay blob
  * @tree_node: Node offset of the node to operate on
  * @fixup_node: Node offset of the matching local fixups node
  * @delta: Offset to shift the phandles of
  *
- * overlay_update_local_nodes_rt_references() update the phandles
+ * overlay_update_local_nodes_references() update the phandles
  * pointing to a node within the device tree overlay by adding a
  * constant delta.
  *
@@ -202,7 +202,7 @@ static int overlay_adjust_local_phandles(void *fdto, uint32_t delta)
  *      0 on success
  *      Negative error code on failure
  */
-static int overlay_update_local_node_rt_references(void *fdto,
+static int overlay_update_local_node_references(void *fdto,
 						int tree_node,
 						int fixup_node,
 						uint32_t delta)
@@ -279,7 +279,7 @@ static int overlay_update_local_node_rt_references(void *fdto,
 		if (tree_child < 0)
 			return tree_child;
 
-		ret = overlay_update_local_node_rt_references(fdto,
+		ret = overlay_update_local_node_references(fdto,
 							   tree_child,
 							   fixup_child,
 							   delta);
@@ -291,11 +291,11 @@ static int overlay_update_local_node_rt_references(void *fdto,
 }
 
 /**
- * overlay_update_local_rt_references - Adjust the overlay rt_references
+ * overlay_update_local_references - Adjust the overlay references
  * @fdto: Device tree overlay blob
  * @delta: Offset to shift the phandles of
  *
- * overlay_update_local_rt_references() update all the phandles pointing
+ * overlay_update_local_references() update all the phandles pointing
  * to a node within the device tree overlay by adding a constant
  * delta to not conflict with the base overlay.
  *
@@ -307,7 +307,7 @@ static int overlay_update_local_node_rt_references(void *fdto,
  *      0 on success
  *      Negative error code on failure
  */
-static int overlay_update_local_rt_references(void *fdto, uint32_t delta)
+static int overlay_update_local_references(void *fdto, uint32_t delta)
 {
 	int fixups;
 
@@ -321,9 +321,9 @@ static int overlay_update_local_rt_references(void *fdto, uint32_t delta)
 	}
 
 	/*
-	 * Update our local rt_references from the root of the tree
+	 * Update our local references from the root of the tree
 	 */
-	return overlay_update_local_node_rt_references(fdto, 0, fixups,
+	return overlay_update_local_node_references(fdto, 0, fixups,
 						    delta);
 }
 
@@ -334,10 +334,10 @@ static int overlay_update_local_rt_references(void *fdto, uint32_t delta)
  * @symbols_off: Node offset of the symbols node in the base device tree
  * @path: Path to a node holding a phandle in the overlay
  * @path_len: number of path characters to consider
- * @name: Name of the property holding the phandle rt_reference in the overlay
+ * @name: Name of the property holding the phandle reference in the overlay
  * @name_len: number of name characters to consider
  * @poffset: Offset within the overlay property where the phandle is stored
- * @label: Label of the node rt_referenced by the phandle
+ * @label: Label of the node referenced by the phandle
  *
  * overlay_fixup_one_phandle() resolves an overlay phandle pointing to
  * a node in the base device tree.
@@ -670,7 +670,7 @@ static int get_path_len(const void *fdt, int nodeoffset)
  * symbols of the applied overlay
  *
  * This is the last step in the device tree overlay application
- * process, allowing the rt_reference of overlay symbols by subsequent
+ * process, allowing the reference of overlay symbols by subsequent
  * overlay operations.
  *
  * returns:
@@ -725,7 +725,7 @@ static int overlay_symbol_update(void *fdt, void *fdto)
 		/* get fragment name first */
 		s = strchr(path + 1, '/');
 		if (!s) {
-			/* Symbol rt_refers to something that won't end
+			/* Symbol refers to something that won't end
 			 * up in the target tree */
 			continue;
 		}
@@ -745,7 +745,7 @@ static int overlay_symbol_update(void *fdt, void *fdto)
 			rel_path = "";
 			rel_path_len = 0;
 		} else {
-			/* Symbol rt_refers to something that won't end
+			/* Symbol refers to something that won't end
 			 * up in the target tree */
 			continue;
 		}
@@ -828,7 +828,7 @@ int fdt_overlay_apply(void *fdt, void *fdto)
 	if (ret)
 		goto err;
 
-	ret = overlay_update_local_rt_references(fdto, delta);
+	ret = overlay_update_local_references(fdto, delta);
 	if (ret)
 		goto err;
 

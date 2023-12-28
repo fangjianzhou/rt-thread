@@ -7,7 +7,7 @@
  * Date           Author       Notes
  * 2022-08-25     GuEe-GUI     first version
  */
-#include <posix/string.h>
+
 #include <rthw.h>
 #include <rtthread.h>
 
@@ -699,7 +699,7 @@ rt_err_t rt_fdt_scan_chosen_stdout(void)
         const char *stdout_path = RT_NULL;
         const char *bootargs = fdt_getprop(_fdt, offset, "bootargs", &len);
 
-        if (bootargs && (options = rt_strstr(bootargs, "earlycon")))
+        if (bootargs && (options = strstr(bootargs, "earlycon")))
         {
             options += sizeof("earlycon") - 1;
 
@@ -1077,7 +1077,7 @@ static rt_err_t fdt_unflatten_single(struct rt_ofw_node *np, int node_off)
 
         np->parent = parent;
 
-        rt_ref_init(&np->rt_ref);
+        rt_ref_init(&np->ref);
         np->flags = 0;
 
         if (!np->child)

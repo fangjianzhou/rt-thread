@@ -9,12 +9,6 @@
  * 2023-11-03     zmshahaha    support rk3588
  */
 
-#include "clk-rk.h"
-#include "clk-pll.h"
-
-#define DBG_TAG "clk.pll"
-#define DBG_LVL DBG_INFO
-#include <rtdbg.h>
 
 static struct rk_pll_rate_table auto_table;
 
@@ -99,8 +93,8 @@ void rational_best_approximation(rt_ubase_t given_numerator,
  * FOUTVCO = Fractional PLL non-divided output frequency
  * FOUTPOSTDIV = Fractional PLL divided output frequency
  *               (output of second post divider)
- * FREF = Fractional PLL input rt_reference frequency, (the OSC_HZ 24MHz input)
- * REFDIV = Fractional PLL input rt_reference clock divider
+ * FREF = Fractional PLL input reference frequency, (the OSC_HZ 24MHz input)
+ * REFDIV = Fractional PLL input reference clock divider
  * FBDIV = Integer value programmed into feedback divide
  */
 
@@ -155,7 +149,7 @@ static struct rk_pll_rate_table *rk_pll_clk_set_by_auto(rt_ubase_t fin_hz, rt_ub
         fin_hz /= MHZ;
         foutvco /= MHZ;
         clk_gcd = gcd(fin_hz, foutvco);
-        rate_table->rt_refdiv = fin_hz / clk_gcd;
+        rate_table->refdiv = fin_hz / clk_gcd;
         rate_table->fbdiv = foutvco / clk_gcd;
 
         rate_table->frac = 0;
@@ -163,14 +157,14 @@ static struct rk_pll_rate_table *rk_pll_clk_set_by_auto(rt_ubase_t fin_hz, rt_ub
     else
     {
         clk_gcd = gcd(fin_hz / MHZ, foutvco / MHZ);
-        rate_table->rt_refdiv = fin_hz / MHZ / clk_gcd;
+        rate_table->refdiv = fin_hz / MHZ / clk_gcd;
         rate_table->fbdiv = foutvco / MHZ / clk_gcd;
 
         rate_table->frac = 0;
 
         f_frac = (foutvco % MHZ);
         fin_64 = fin_hz;
-        fin_64 = fin_64 / rate_table->rt_refdiv;
+        fin_64 = fin_64 / rate_table->refdiv;
         frac_64 = f_frac << 24;
         frac_64 = frac_64 / fin_64;
         rate_table->frac = frac_64;
@@ -189,7 +183,7 @@ rk3588_pll_clk_set_by_auto(rt_ubase_t fin_hz,
 {
 	struct rk_pll_rate_table *rate_table = &auto_table;
 	rt_uint32_t p, m, s;
-	rt_ubase_t fvco, frt_ref, fout, ffrac;
+	rt_ubase_t fvco, fref, fout, ffrac;
 
 	if (fin_hz == 0 || fout_hz == 0 || fout_hz == fin_hz)
 		return NULL;
@@ -228,10 +222,10 @@ rk3588_pll_clk_set_by_auto(rt_ubase_t fin_hz,
 						rate_table->p = p;
 						rate_table->m = m;
 						rate_table->s = s;
-						frt_ref = fin_hz / p;
-						ffrac = fvco - (m * frt_ref);
+						fref = fin_hz / p;
+						ffrac = fvco - (m * fref);
 						fout = ffrac * 65536;
-						rate_table->k = fout / frt_ref;
+						rate_table->k = fout / fref;
 						return rate_table;
 					}
 				}
@@ -291,7 +285,7 @@ static int rk3036_pll_set_rate(struct rk_pll_clock *pll, void *base, rt_ubase_t 
     rk_clrsetreg(base + pll->con_offset, (RK3036_PLLCON0_POSTDIV1_MASK | RK3036_PLLCON0_FBDIV_MASK),
             (rate->postdiv1 << RK3036_PLLCON0_POSTDIV1_SHIFT) |rate->fbdiv);
     rk_clrsetreg(base + pll->con_offset + 0x4, (RK3036_PLLCON1_POSTDIV2_MASK | RK3036_PLLCON1_REFDIV_MASK),
-            (rate->postdiv2 << RK3036_PLLCON1_POSTDIV2_SHIFT | rate->rt_refdiv << RK3036_PLLCON1_REFDIV_SHIFT));
+            (rate->postdiv2 << RK3036_PLLCON1_POSTDIV2_SHIFT | rate->refdiv << RK3036_PLLCON1_REFDIV_SHIFT));
 
     if (!rate->dsmpd)
     {
@@ -319,7 +313,7 @@ static int rk3036_pll_set_rate(struct rk_pll_clock *pll, void *base, rt_ubase_t 
 
 static rt_ubase_t rk3036_pll_get_rate(struct rk_pll_clock *pll, void *base, rt_ubase_t pll_id)
 {
-    rt_uint32_t rt_refdiv, fbdiv, postdiv1, postdiv2, dsmpd, frac;
+    rt_uint32_t refdiv, fbdiv, postdiv1, postdiv2, dsmpd, frac;
     rt_uint32_t con = 0, shift, mask;
     rt_ubase_t rate;
 
@@ -340,17 +334,17 @@ static rt_ubase_t rk3036_pll_get_rate(struct rk_pll_clock *pll, void *base, rt_u
         fbdiv = (con & RK3036_PLLCON0_FBDIV_MASK) >> RK3036_PLLCON0_FBDIV_SHIFT;
         con = HWREG32(base + pll->con_offset + 0x4);
         postdiv2 = (con & RK3036_PLLCON1_POSTDIV2_MASK) >> RK3036_PLLCON1_POSTDIV2_SHIFT;
-        rt_refdiv = (con & RK3036_PLLCON1_REFDIV_MASK) >> RK3036_PLLCON1_REFDIV_SHIFT;
+        refdiv = (con & RK3036_PLLCON1_REFDIV_MASK) >> RK3036_PLLCON1_REFDIV_SHIFT;
         dsmpd = (con & RK3036_PLLCON1_DSMPD_MASK) >> RK3036_PLLCON1_DSMPD_SHIFT;
         con = HWREG32(base + pll->con_offset + 0x8);
         frac = (con & RK3036_PLLCON2_FRAC_MASK) >> RK3036_PLLCON2_FRAC_SHIFT;
-        rate = (24 * fbdiv / (rt_refdiv * postdiv1 * postdiv2)) * 1000000;
+        rate = (24 * fbdiv / (refdiv * postdiv1 * postdiv2)) * 1000000;
 
         if (dsmpd == 0)
         {
             rt_uint64_t frac_rate = OSC_HZ * (rt_uint64_t)frac;
 
-            rt_do_div(frac_rate, rt_refdiv);
+            rt_do_div(frac_rate, refdiv);
             frac_rate >>= 24;
             rt_do_div(frac_rate, postdiv1);
             rt_do_div(frac_rate, postdiv1);
@@ -604,7 +598,23 @@ const struct rk_cpu_rate_table *rk_get_cpu_settings(struct rk_cpu_rate_table *cp
         return ps;
     }
 }
+rt_base_t rk_clk_pll_round_rate(const struct rk_pll_rate_table *pll_rates,
+        rt_size_t rate_count, rt_ubase_t drate, rt_ubase_t *prate)
+{
+    int i;
 
+    /* Assumming rate_table is in descending order */
+    for (i = 0; i < rate_count; i++)
+    {
+        if (drate >= pll_rates[i].rate)
+        {
+            return pll_rates[i].rate;
+        }
+    }
+
+    /* return minimum supported value */
+    return pll_rates[i - 1].rate;
+}
 void rk_clk_set_default_rates(struct rt_clk *clk,
         rt_err_t (*clk_set_rate)(struct rt_clk *, rt_ubase_t, rt_ubase_t), int id)
 {

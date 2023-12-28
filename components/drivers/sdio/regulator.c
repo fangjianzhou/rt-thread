@@ -155,7 +155,7 @@ rt_err_t sdio_regulator_set_vqmmc(struct rt_mmcsd_host *host,
 }
 
 rt_err_t sdio_regulator_get_supply(struct rt_device *dev, struct rt_mmcsd_host *host)
-{
+{return 0;
     if (!dev || !host)
     {
         return -RT_EINVAL;

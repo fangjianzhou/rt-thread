@@ -7,7 +7,7 @@
  * Date           Author       Notes
  * 2022-08-25     GuEe-GUI     first version
  */
-#include <posix/string.h>
+
 #include <rtthread.h>
 
 #include <drivers/pic.h>

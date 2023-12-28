@@ -16,3 +16,5 @@ config RT_FIRMWARE_QEMU_FW_CFG
     select RT_USING_DFS
     select RT_USING_DFS_DIRECTFS
     default n
+
+source "$RTT_DIR/components/drivers/firmware/arm_scmi/Kconfig"

@@ -317,7 +317,7 @@ int fdt_check_header(const void *fdt);
  *
  * fdt_move() relocates, if possible, the device tree blob located at
  * fdt to the buffer at buf of size bufsize.  The buffer may overlap
- * with the existing device tree blob at fdt.  Thert_refore,
+ * with the existing device tree blob at fdt.  Therefore,
  *     fdt_move(fdt, fdt, fdt_totalsize(fdt))
  * should always succeed.
  *
@@ -856,7 +856,7 @@ const char *fdt_get_alias_namelen(const void *fdt,
 #endif
 
 /**
- * fdt_get_alias - retrieve the path rt_referenced by a given alias
+ * fdt_get_alias - retrieve the path referenced by a given alias
  * @fdt: pointer to the device tree blob
  * @name: name of the alias th look up
  *
@@ -886,7 +886,7 @@ const char *fdt_get_alias(const void *fdt, const char *name);
  *	0, on success
  *		buf contains the absolute path of the node at
  *		nodeoffset, as a NUL-terminated string.
- *	-FDT_ERR_BADOFFSET, nodeoffset does not rt_refer to a BEGIN_NODE tag
+ *	-FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
  *	-FDT_ERR_NOSPACE, the path of the given node is longer than (bufsize-1)
  *		characters and will not fit in the given buffer.
  *	-FDT_ERR_BADMAGIC,
@@ -918,7 +918,7 @@ int fdt_get_path(const void *fdt, int nodeoffset, char *buf, int buflen);
  * returns:
  *	structure block offset of the node at node offset's ancestor
  *		of depth supernodedepth (>=0), on success
- *	-FDT_ERR_BADOFFSET, nodeoffset does not rt_refer to a BEGIN_NODE tag
+ *	-FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
  *	-FDT_ERR_NOTFOUND, supernodedepth was greater than the depth of
  *		nodeoffset
  *	-FDT_ERR_BADMAGIC,
@@ -942,7 +942,7 @@ int fdt_supernode_atdepth_offset(const void *fdt, int nodeoffset,
  *
  * returns:
  *	depth of the node at nodeoffset (>=0), on success
- *	-FDT_ERR_BADOFFSET, nodeoffset does not rt_refer to a BEGIN_NODE tag
+ *	-FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
  *	-FDT_ERR_BADMAGIC,
  *	-FDT_ERR_BADVERSION,
  *	-FDT_ERR_BADSTATE,
@@ -965,7 +965,7 @@ int fdt_node_depth(const void *fdt, int nodeoffset);
  * returns:
  *	structure block offset of the parent of the node at nodeoffset
  *		(>=0), on success
- *	-FDT_ERR_BADOFFSET, nodeoffset does not rt_refer to a BEGIN_NODE tag
+ *	-FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
  *	-FDT_ERR_BADMAGIC,
  *	-FDT_ERR_BADVERSION,
  *	-FDT_ERR_BADSTATE,
@@ -1005,7 +1005,7 @@ int fdt_parent_offset(const void *fdt, int nodeoffset);
  *		 on success
  *	-FDT_ERR_NOTFOUND, no node matching the criterion exists in the
  *		tree after startoffset
- *	-FDT_ERR_BADOFFSET, nodeoffset does not rt_refer to a BEGIN_NODE tag
+ *	-FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
  *	-FDT_ERR_BADMAGIC,
  *	-FDT_ERR_BADVERSION,
  *	-FDT_ERR_BADSTATE,
@@ -1051,7 +1051,7 @@ int fdt_node_offset_by_phandle(const void *fdt, uint32_t phandle);
  *	1, if the node has a 'compatible' property, but it does not list
  *		the given string
  *	-FDT_ERR_NOTFOUND, if the given node has no 'compatible' property
- *	-FDT_ERR_BADOFFSET, if nodeoffset does not rt_refer to a BEGIN_NODE tag
+ *	-FDT_ERR_BADOFFSET, if nodeoffset does not refer to a BEGIN_NODE tag
  *	-FDT_ERR_BADMAGIC,
  *	-FDT_ERR_BADVERSION,
  *	-FDT_ERR_BADSTATE,
@@ -1088,7 +1088,7 @@ int fdt_node_check_compatible(const void *fdt, int nodeoffset,
  *		 on success
  *	-FDT_ERR_NOTFOUND, no node matching the criterion exists in the
  *		tree after startoffset
- *	-FDT_ERR_BADOFFSET, nodeoffset does not rt_refer to a BEGIN_NODE tag
+ *	-FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
  *	-FDT_ERR_BADMAGIC,
  *	-FDT_ERR_BADVERSION,
  *	-FDT_ERR_BADSTATE,
@@ -1533,7 +1533,7 @@ int fdt_pack(void *fdt);
  * address address of length size.
  *
  * This function will insert data into the reserve map and will
- * thert_refore change the indexes of some entries in the table.
+ * therefore change the indexes of some entries in the table.
  *
  * returns:
  *	0, on success
@@ -1557,7 +1557,7 @@ int fdt_add_mem_rsv(void *fdt, uint64_t address, uint64_t size);
  * the blob.
  *
  * This function will delete data from the reservation table and will
- * thert_refore change the indexes of some entries in the table.
+ * therefore change the indexes of some entries in the table.
  *
  * returns:
  *	0, on success
@@ -1585,7 +1585,7 @@ int fdt_del_mem_rsv(void *fdt, int n);
  * with a name equal to one of the given node's siblings.
  *
  * This function may insert or delete data from the blob, and will
- * thert_refore change the offsets of some existing nodes.
+ * therefore change the offsets of some existing nodes.
  *
  * returns:
  *	0, on success
@@ -1611,7 +1611,7 @@ int fdt_set_name(void *fdt, int nodeoffset, const char *name);
  * does not already exist.
  *
  * This function may insert or delete data from the blob, and will
- * thert_refore change the offsets of some existing nodes.
+ * therefore change the offsets of some existing nodes.
  *
  * returns:
  *	0, on success
@@ -1642,7 +1642,7 @@ int fdt_setprop(void *fdt, int nodeoffset, const char *name,
  * property data is returned.
  *
  * This function may insert or delete data from the blob, and will
- * thert_refore change the offsets of some existing nodes.
+ * therefore change the offsets of some existing nodes.
  *
  * returns:
  *	0, on success
@@ -1673,7 +1673,7 @@ int fdt_setprop_placeholder(void *fdt, int nodeoffset, const char *name,
  * not already exist.
  *
  * This function may insert or delete data from the blob, and will
- * thert_refore change the offsets of some existing nodes.
+ * therefore change the offsets of some existing nodes.
  *
  * returns:
  *	0, on success
@@ -1708,7 +1708,7 @@ static inline int fdt_setprop_u32(void *fdt, int nodeoffset, const char *name,
  * not already exist.
  *
  * This function may insert or delete data from the blob, and will
- * thert_refore change the offsets of some existing nodes.
+ * therefore change the offsets of some existing nodes.
  *
  * returns:
  *	0, on success
@@ -1760,7 +1760,7 @@ static inline int fdt_setprop_cell(void *fdt, int nodeoffset, const char *name,
  * new property with that value if it does not already exist.
  *
  * This function may insert or delete data from the blob, and will
- * thert_refore change the offsets of some existing nodes.
+ * therefore change the offsets of some existing nodes.
  *
  * returns:
  *	0, on success
@@ -1790,7 +1790,7 @@ static inline int fdt_setprop_cell(void *fdt, int nodeoffset, const char *name,
  * property if it does not already exist.
  *
  * This function may insert or delete data from the blob, and will
- * thert_refore change the offsets of some existing nodes.
+ * therefore change the offsets of some existing nodes.
  *
  * returns:
  *	0, on success
@@ -1819,7 +1819,7 @@ static inline int fdt_setprop_cell(void *fdt, int nodeoffset, const char *name,
  * fdt_appendprop() appends the value to the named property in the
  * given node, creating the property if it does not already exist.
  *
- * This function may insert data into the blob, and will thert_refore
+ * This function may insert data into the blob, and will therefore
  * change the offsets of some existing nodes.
  *
  * returns:
@@ -1850,7 +1850,7 @@ int fdt_appendprop(void *fdt, int nodeoffset, const char *name,
  * property in the given node, or creates a new property with that
  * value if it does not already exist.
  *
- * This function may insert data into the blob, and will thert_refore
+ * This function may insert data into the blob, and will therefore
  * change the offsets of some existing nodes.
  *
  * returns:
@@ -1885,7 +1885,7 @@ static inline int fdt_appendprop_u32(void *fdt, int nodeoffset,
  * property in the given node, or creates a new property with that
  * value if it does not already exist.
  *
- * This function may insert data into the blob, and will thert_refore
+ * This function may insert data into the blob, and will therefore
  * change the offsets of some existing nodes.
  *
  * returns:
@@ -1936,7 +1936,7 @@ static inline int fdt_appendprop_cell(void *fdt, int nodeoffset,
  * the named property in the given node, or creates a new property
  * with that value if it does not already exist.
  *
- * This function may insert data into the blob, and will thert_refore
+ * This function may insert data into the blob, and will therefore
  * change the offsets of some existing nodes.
  *
  * returns:
@@ -1971,7 +1971,7 @@ static inline int fdt_appendprop_cell(void *fdt, int nodeoffset,
  * If "name" is not specified, a default "reg" is used.
  * Cell sizes are determined by parent's #address-cells and #size-cells.
  *
- * This function may insert data into the blob, and will thert_refore
+ * This function may insert data into the blob, and will therefore
  * change the offsets of some existing nodes.
  *
  * returns:
@@ -2000,7 +2000,7 @@ int fdt_appendprop_addrrange(void *fdt, int parent, int nodeoffset,
  *
  * fdt_del_property() will delete the given property.
  *
- * This function will delete data from the blob, and will thert_refore
+ * This function will delete data from the blob, and will therefore
  * change the offsets of some existing nodes.
  *
  * returns:
@@ -2046,7 +2046,7 @@ int fdt_add_subnode_namelen(void *fdt, int parentoffset,
  * structure block offset parentoffset, with the given name (which
  * should include the unit address, if any).
  *
- * This function will insert data into the blob, and will thert_refore
+ * This function will insert data into the blob, and will therefore
  * change the offsets of some existing nodes.
  *
  * returns:
@@ -2077,7 +2077,7 @@ int fdt_add_subnode(void *fdt, int parentoffset, const char *name);
  * fdt_del_node() will remove the given node, including all its
  * subnodes if any, from the blob.
  *
- * This function will delete data from the blob, and will thert_refore
+ * This function will delete data from the blob, and will therefore
  * change the offsets of some existing nodes.
  *
  * returns:

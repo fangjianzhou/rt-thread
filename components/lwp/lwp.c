@@ -64,7 +64,7 @@ extern char working_directory[];
 
 static rt_err_t lwp_default_console_setup(void)
 {
-    rt_device_t bakdev = rt_device_find("ttyS0");
+    rt_device_t bakdev = rt_device_find("ttyS3");
     rt_err_t rc;
 
     if (bakdev)

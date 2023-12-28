@@ -12,6 +12,9 @@ CPPPATH = [cwd + '/../include']
 
 src = ['clk.c']
 
+if GetDepend(['RT_CLK_SCMI']):
+    src += ['clk-scmi.c']
+
 if GetDepend(['RT_USING_OFW']):
     src += ['clk-fixed-rate.c']
 

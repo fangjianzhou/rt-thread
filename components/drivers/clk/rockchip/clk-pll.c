@@ -6,9 +6,32 @@
  * Change Logs:
  * Date           Author       Notes
  * 2022-3-08      GuEe-GUI     the first version
- * 2023-11-03     zmshahaha    support rk3588
  */
 
+/* Define pll mode */
+#define RKCLK_PLL_MODE_SLOW     0
+#define RKCLK_PLL_MODE_NORMAL   1
+#define RKCLK_PLL_MODE_DEEP     2
+
+/* Only support RK3036 type CLK */
+#define PLLCON0_FBDIV_MASK      0xfff
+#define PLLCON0_FBDIV_SHIFT     0
+#define PLLCON0_POSTDIV1_MASK   (0x7 << 12)
+#define PLLCON0_POSTDIV1_SHIFT  12
+#define PLLCON1_LOCK_STATUS     (1 << 10)
+#define PLLCON1_REFDIV_MASK     0x3f
+#define PLLCON1_REFDIV_SHIFT    0
+#define PLLCON1_POSTDIV2_MASK   (0x7 << 6)
+#define PLLCON1_POSTDIV2_SHIFT  6
+#define PLLCON1_DSMPD_MASK      (0x1 << 12)
+#define PLLCON1_DSMPD_SHIFT     12
+#define PLLCON2_FRAC_MASK       0xffffff
+#define PLLCON2_FRAC_SHIFT      0
+#define PLLCON1_PWRDOWN_SHIT    13
+#define PLLCON1_PWRDOWN         (1 << PLLCON1_PWRDOWN_SHIT)
+
+#define MIN_FOUTVCO_FREQ        (800 * MHZ)
+#define MAX_FOUTVCO_FREQ        (2000 * MHZ)
 
 static struct rk_pll_rate_table auto_table;
 
@@ -38,7 +61,7 @@ static int gcd(int m, int n)
  * for theoretical background, see:
  * http://en.wikipedia.org/wiki/Continued_fraction
  */
-void rational_best_approximation(rt_ubase_t given_numerator,
+static void rational_best_approximation(rt_ubase_t given_numerator,
                     rt_ubase_t given_denominator,
                     rt_ubase_t max_numerator,
                     rt_ubase_t max_denominator,
@@ -177,65 +200,6 @@ static struct rk_pll_rate_table *rk_pll_clk_set_by_auto(rt_ubase_t fin_hz, rt_ub
     return rate_table;
 }
 
-static struct rk_pll_rate_table *
-rk3588_pll_clk_set_by_auto(rt_ubase_t fin_hz,
-			   rt_ubase_t fout_hz)
-{
-	struct rk_pll_rate_table *rate_table = &auto_table;
-	rt_uint32_t p, m, s;
-	rt_ubase_t fvco, fref, fout, ffrac;
-
-	if (fin_hz == 0 || fout_hz == 0 || fout_hz == fin_hz)
-		return NULL;
-
-	if (fout_hz > RK3588_FOUT_MAX_HZ || fout_hz < RK3588_FOUT_MIN_HZ)
-		return NULL;
-
-	if (fin_hz / MHZ * MHZ == fin_hz && fout_hz / MHZ * MHZ == fout_hz) {
-		for (s = 0; s <= 6; s++) {
-			fvco = fout_hz << s;
-			if (fvco < RK3588_VCO_MIN_HZ ||
-			    fvco > RK3588_VCO_MAX_HZ)
-				continue;
-			for (p = 2; p <= 4; p++) {
-				for (m = 64; m <= 1023; m++) {
-					if (fvco == m * fin_hz / p) {
-						rate_table->p = p;
-						rate_table->m = m;
-						rate_table->s = s;
-						rate_table->k = 0;
-						return rate_table;
-					}
-				}
-			}
-		}
-		LOG_E("CANNOT FIND Fout by auto,fout = %lu\n", fout_hz);
-	} else {
-		for (s = 0; s <= 6; s++) {
-			fvco = fout_hz << s;
-			if (fvco < RK3588_VCO_MIN_HZ ||
-			    fvco > RK3588_VCO_MAX_HZ)
-				continue;
-			for (p = 1; p <= 4; p++) {
-				for (m = 64; m <= 1023; m++) {
-					if ((fvco >= m * fin_hz / p) && (fvco < (m + 1) * fin_hz / p)) {
-						rate_table->p = p;
-						rate_table->m = m;
-						rate_table->s = s;
-						fref = fin_hz / p;
-						ffrac = fvco - (m * fref);
-						fout = ffrac * 65536;
-						rate_table->k = fout / fref;
-						return rate_table;
-					}
-				}
-			}
-		}
-		LOG_E("CANNOT FIND Fout by auto,fout = %lu\n", fout_hz);
-	}
-	return NULL;
-}
-
 static const struct rk_pll_rate_table *rk_get_pll_settings(struct rk_pll_clock *pll, rt_ubase_t rate)
 {
     struct rk_pll_rate_table *rate_table = pll->rate_table;
@@ -251,10 +215,7 @@ static const struct rk_pll_rate_table *rk_get_pll_settings(struct rk_pll_clock *
 
     if (rate_table->rate != rate)
     {
-        if (pll->type == pll_rk3588)
-			return rk3588_pll_clk_set_by_auto(24 * MHZ, rate);
-		else
-			return rk_pll_clk_set_by_auto(24 * MHZ, rate);
+        return rk_pll_clk_set_by_auto(24 * MHZ, rate);
     }
     else
     {
@@ -262,10 +223,18 @@ static const struct rk_pll_rate_table *rk_get_pll_settings(struct rk_pll_clock *
     }
 }
 
-static int rk3036_pll_set_rate(struct rk_pll_clock *pll, void *base, rt_ubase_t pll_id, rt_ubase_t drate)
+static rt_ubase_t rk_pll_get_rate(struct rk_pll_clock *pll, void *base);
+
+static int rk_pll_set_rate(struct rk_pll_clock *pll, void *base, rt_ubase_t drate)
 {
     const struct rk_pll_rate_table *rate;
 
+    if (rk_pll_get_rate(pll, base) == drate)
+    {
+        return 0;
+    }
+
+    pll->mode_mask = PLL_MODE_MASK;
     rate = rk_get_pll_settings(pll, drate);
 
     if (!rate)
@@ -280,26 +249,26 @@ static int rk3036_pll_set_rate(struct rk_pll_clock *pll, void *base, rt_ubase_t 
     rk_clrsetreg(base + pll->mode_offset, pll->mode_mask << pll->mode_shift, RKCLK_PLL_MODE_SLOW << pll->mode_shift);
 
     /* Power down */
-    rk_setreg(base + pll->con_offset + 0x4, 1 << RK3036_PLLCON1_PWRDOWN_SHIT);
+    rk_setreg(base + pll->con_offset + 0x4, 1 << PLLCON1_PWRDOWN_SHIT);
 
-    rk_clrsetreg(base + pll->con_offset, (RK3036_PLLCON0_POSTDIV1_MASK | RK3036_PLLCON0_FBDIV_MASK),
-            (rate->postdiv1 << RK3036_PLLCON0_POSTDIV1_SHIFT) |rate->fbdiv);
-    rk_clrsetreg(base + pll->con_offset + 0x4, (RK3036_PLLCON1_POSTDIV2_MASK | RK3036_PLLCON1_REFDIV_MASK),
-            (rate->postdiv2 << RK3036_PLLCON1_POSTDIV2_SHIFT | rate->refdiv << RK3036_PLLCON1_REFDIV_SHIFT));
+    rk_clrsetreg(base + pll->con_offset, (PLLCON0_POSTDIV1_MASK | PLLCON0_FBDIV_MASK),
+            (rate->postdiv1 << PLLCON0_POSTDIV1_SHIFT) |rate->fbdiv);
+    rk_clrsetreg(base + pll->con_offset + 0x4, (PLLCON1_POSTDIV2_MASK | PLLCON1_REFDIV_MASK),
+            (rate->postdiv2 << PLLCON1_POSTDIV2_SHIFT | rate->refdiv << PLLCON1_REFDIV_SHIFT));
 
     if (!rate->dsmpd)
     {
         rt_uint32_t val;
 
-        rk_clrsetreg(base + pll->con_offset + 0x4, RK3036_PLLCON1_DSMPD_MASK,
-                rate->dsmpd << RK3036_PLLCON1_DSMPD_SHIFT);
+        rk_clrsetreg(base + pll->con_offset + 0x4, PLLCON1_DSMPD_MASK,
+                rate->dsmpd << PLLCON1_DSMPD_SHIFT);
 
-        val = HWREG32(base + pll->con_offset + 0x8) & (~RK3036_PLLCON2_FRAC_MASK);
-        HWREG32(base + pll->con_offset + 0x8) = val | (rate->frac << RK3036_PLLCON2_FRAC_SHIFT);
+        val = HWREG32(base + pll->con_offset + 0x8) & (~PLLCON2_FRAC_MASK);
+        HWREG32(base + pll->con_offset + 0x8) = val | (rate->frac << PLLCON2_FRAC_SHIFT);
     }
 
     /* Power Up */
-    rk_clrreg(base + pll->con_offset + 0x4, 1 << RK3036_PLLCON1_PWRDOWN_SHIT);
+    rk_clrreg(base + pll->con_offset + 0x4, 1 << PLLCON1_PWRDOWN_SHIT);
 
     /* Waiting for pll lock */
     while (!(HWREG32(base + pll->con_offset + 0x4) & (1 << pll->lock_shift)))
@@ -311,7 +280,7 @@ static int rk3036_pll_set_rate(struct rk_pll_clock *pll, void *base, rt_ubase_t 
     return 0;
 }
 
-static rt_ubase_t rk3036_pll_get_rate(struct rk_pll_clock *pll, void *base, rt_ubase_t pll_id)
+static rt_ubase_t rk_pll_get_rate(struct rk_pll_clock *pll, void *base)
 {
     rt_uint32_t refdiv, fbdiv, postdiv1, postdiv2, dsmpd, frac;
     rt_uint32_t con = 0, shift, mask;
@@ -330,14 +299,14 @@ static rt_ubase_t rk3036_pll_get_rate(struct rk_pll_clock *pll, void *base, rt_u
     case RKCLK_PLL_MODE_NORMAL:
         /* normal mode */
         con = HWREG32(base + pll->con_offset);
-        postdiv1 = (con & RK3036_PLLCON0_POSTDIV1_MASK) >> RK3036_PLLCON0_POSTDIV1_SHIFT;
-        fbdiv = (con & RK3036_PLLCON0_FBDIV_MASK) >> RK3036_PLLCON0_FBDIV_SHIFT;
+        postdiv1 = (con & PLLCON0_POSTDIV1_MASK) >> PLLCON0_POSTDIV1_SHIFT;
+        fbdiv = (con & PLLCON0_FBDIV_MASK) >> PLLCON0_FBDIV_SHIFT;
         con = HWREG32(base + pll->con_offset + 0x4);
-        postdiv2 = (con & RK3036_PLLCON1_POSTDIV2_MASK) >> RK3036_PLLCON1_POSTDIV2_SHIFT;
-        refdiv = (con & RK3036_PLLCON1_REFDIV_MASK) >> RK3036_PLLCON1_REFDIV_SHIFT;
-        dsmpd = (con & RK3036_PLLCON1_DSMPD_MASK) >> RK3036_PLLCON1_DSMPD_SHIFT;
+        postdiv2 = (con & PLLCON1_POSTDIV2_MASK) >> PLLCON1_POSTDIV2_SHIFT;
+        refdiv = (con & PLLCON1_REFDIV_MASK) >> PLLCON1_REFDIV_SHIFT;
+        dsmpd = (con & PLLCON1_DSMPD_MASK) >> PLLCON1_DSMPD_SHIFT;
         con = HWREG32(base + pll->con_offset + 0x8);
-        frac = (con & RK3036_PLLCON2_FRAC_MASK) >> RK3036_PLLCON2_FRAC_SHIFT;
+        frac = (con & PLLCON2_FRAC_MASK) >> PLLCON2_FRAC_SHIFT;
         rate = (24 * fbdiv / (refdiv * postdiv1 * postdiv2)) * 1000000;
 
         if (dsmpd == 0)
@@ -357,227 +326,7 @@ static rt_ubase_t rk3036_pll_get_rate(struct rk_pll_clock *pll, void *base, rt_u
     }
 }
 
-static int rk3588_pll_set_rate(struct rk_pll_clock *pll,
-			       void *base, rt_ubase_t pll_id,
-			       rt_ubase_t drate)
-{
-	const struct rk_pll_rate_table *rate;
-
-	rate = rk_get_pll_settings(pll, drate);
-	if (!rate) {
-		LOG_D("%s unsupported rate\n", __func__);
-		return -RT_EINVAL;
-	}
-
-	LOG_D("%s: rate settings for %lu p: %d, m: %d, s: %d, k: %d\n",
-	      __func__, rate->rate, rate->p, rate->m, rate->s, rate->k);
-
-	/*
-	 * When power on or changing PLL setting,
-	 * we must force PLL into slow mode to ensure output stable clock.
-	 */
-	if (pll_id == 3)
-		rk_clrsetreg(base + 0x84c, 0x1 << 1, 0x1 << 1);
-
-	rk_clrsetreg(base + pll->mode_offset,
-		     pll->mode_mask << pll->mode_shift,
-		     RKCLK_PLL_MODE_SLOW << pll->mode_shift);
-	if (pll_id == 0)
-		rk_clrsetreg(base + RK3588_B0PLL_CLKSEL_CON(0),
-			     pll->mode_mask << 6,
-			     RKCLK_PLL_MODE_SLOW << 6);
-	else if (pll_id == 1)
-		rk_clrsetreg(base + RK3588_B1PLL_CLKSEL_CON(0),
-			     pll->mode_mask << 6,
-			     RKCLK_PLL_MODE_SLOW << 6);
-	else if (pll_id == 2)
-		rk_clrsetreg(base + RK3588_LPLL_CLKSEL_CON(5),
-			     pll->mode_mask << 14,
-			     RKCLK_PLL_MODE_SLOW << 14);
-
-	/* Power down */
-	rk_setreg(base + pll->con_offset + RK3588_PLLCON(1),
-		  RK3588_PLLCON1_PWRDOWN);
-
-	rk_clrsetreg(base + pll->con_offset,
-		     RK3588_PLLCON0_M_MASK,
-		     (rate->m << RK3588_PLLCON0_M_SHIFT));
-	rk_clrsetreg(base + pll->con_offset + RK3588_PLLCON(1),
-		     (RK3588_PLLCON1_P_MASK |
-		     RK3588_PLLCON1_S_MASK),
-		     (rate->p << RK3588_PLLCON1_P_SHIFT |
-		     rate->s << RK3588_PLLCON1_S_SHIFT));
-	if (rate->k) {
-		rk_clrsetreg(base + pll->con_offset + RK3588_PLLCON(2),
-			     RK3588_PLLCON2_K_MASK,
-			     rate->k << RK3588_PLLCON2_K_SHIFT);
-	}
-	/* Power up */
-	rk_clrreg(base + pll->con_offset + RK3588_PLLCON(1),
-		  RK3588_PLLCON1_PWRDOWN);
-
-	/* waiting for pll lock */
-	while (!(HWREG32(base + pll->con_offset + RK3588_PLLCON(6)) &
-		RK3588_PLLCON6_LOCK_STATUS)) 
-    {
-	}
-
-	rk_clrsetreg(base + pll->mode_offset, pll->mode_mask << pll->mode_shift,
-		     RKCLK_PLL_MODE_NORMAL << pll->mode_shift);
-	if (pll_id == 0) {
-		rk_clrsetreg(base + RK3588_B0PLL_CLKSEL_CON(0),
-			     pll->mode_mask << 6,
-			     2 << 6);
-		rk_clrsetreg(base + RK3588_B0PLL_CLKSEL_CON(0),
-			     RK3588_CORE_DIV_MASK << RK3588_CORE_B02_DIV_SHIFT,
-			     0 << RK3588_CORE_B02_DIV_SHIFT);
-		rk_clrsetreg(base + RK3588_B0PLL_CLKSEL_CON(1),
-			     RK3588_CORE_DIV_MASK << RK3588_CORE_B13_DIV_SHIFT,
-			     0 << RK3588_CORE_B13_DIV_SHIFT);
-	} else if (pll_id == 1) {
-		rk_clrsetreg(base + RK3588_B1PLL_CLKSEL_CON(0),
-			     pll->mode_mask << 6,
-			     2 << 6);
-		rk_clrsetreg(base + RK3588_B1PLL_CLKSEL_CON(0),
-			     RK3588_CORE_DIV_MASK << RK3588_CORE_B02_DIV_SHIFT,
-			     0 << RK3588_CORE_B02_DIV_SHIFT);
-		rk_clrsetreg(base + RK3588_B1PLL_CLKSEL_CON(1),
-			     RK3588_CORE_DIV_MASK << RK3588_CORE_B13_DIV_SHIFT,
-			     0 << RK3588_CORE_B13_DIV_SHIFT);
-	} else if (pll_id == 2) {
-		rk_clrsetreg(base + RK3588_LPLL_CLKSEL_CON(5),
-			     pll->mode_mask << 14,
-			     2 << 14);
-		rk_clrsetreg(base + RK3588_LPLL_CLKSEL_CON(6),
-			     RK3588_CORE_DIV_MASK << RK3588_CORE_L13_DIV_SHIFT,
-			     0 << RK3588_CORE_L13_DIV_SHIFT);
-		rk_clrsetreg(base + RK3588_LPLL_CLKSEL_CON(6),
-			     RK3588_CORE_DIV_MASK << RK3588_CORE_L02_DIV_SHIFT,
-			     0 << RK3588_CORE_L02_DIV_SHIFT);
-		rk_clrsetreg(base + RK3588_LPLL_CLKSEL_CON(7),
-			     RK3588_CORE_DIV_MASK << RK3588_CORE_L13_DIV_SHIFT,
-			     0 << RK3588_CORE_L13_DIV_SHIFT);
-		rk_clrsetreg(base + RK3588_LPLL_CLKSEL_CON(7),
-			     RK3588_CORE_DIV_MASK << RK3588_CORE_L02_DIV_SHIFT,
-			     0 << RK3588_CORE_L02_DIV_SHIFT);
-	}
-
-	if (pll_id == 3)
-		rk_clrsetreg(base + 0x84c, 0x1 << 1, 0);
-
-	LOG_D("PLL at %p: con0=%x con1= %x con2= %x mode= %x\n",
-	      pll, HWREG32(base + pll->con_offset),
-	      HWREG32(base + pll->con_offset + 0x4),
-	      HWREG32(base + pll->con_offset + 0x8),
-	      HWREG32(base + pll->mode_offset));
-
-	return 0;
-}
-
-static rt_ubase_t rk3588_pll_get_rate(struct rk_pll_clock *pll,
-				 void *base, rt_ubase_t pll_id)
-{
-	rt_uint32_t m, p, s, k;
-	rt_uint32_t con = 0, shift, mode;
-	rt_uint64_t rate, postdiv;
-
-	con = HWREG32(base + pll->mode_offset);
-	shift = pll->mode_shift;
-	if (pll_id == 8)
-		mode = RKCLK_PLL_MODE_NORMAL;
-	else
-		mode = (con & (pll->mode_mask << shift)) >> shift;
-	switch (mode) {
-	case RKCLK_PLL_MODE_SLOW:
-		return OSC_HZ;
-	case RKCLK_PLL_MODE_NORMAL:
-		/* normal mode */
-		con = HWREG32(base + pll->con_offset);
-		m = (con & RK3588_PLLCON0_M_MASK) >>
-			   RK3588_PLLCON0_M_SHIFT;
-		con = HWREG32(base + pll->con_offset + RK3588_PLLCON(1));
-		p = (con & RK3588_PLLCON1_P_MASK) >>
-			   RK3036_PLLCON0_FBDIV_SHIFT;
-		s = (con & RK3588_PLLCON1_S_MASK) >>
-			 RK3588_PLLCON1_S_SHIFT;
-		con = HWREG32(base + pll->con_offset + RK3588_PLLCON(2));
-		k = (con & RK3588_PLLCON2_K_MASK) >>
-			RK3588_PLLCON2_K_SHIFT;
-
-		rate = OSC_HZ / p;
-		rate *= m;
-		if (k) {
-			/* fractional mode */
-			rt_uint64_t frac_rate64 = OSC_HZ * k;
-
-			postdiv = p * 65536;
-			rt_do_div(frac_rate64, postdiv);
-			rate += frac_rate64;
-		}
-		rate = rate >> s;
-		return rate;
-	case RKCLK_PLL_MODE_DEEP:
-	default:
-		return 32768;
-	}
-}
-
-rt_ubase_t rk_pll_get_rate(struct rk_pll_clock *pll,
-			    void *base,
-			    rt_ubase_t pll_id)
-{
-	rt_ubase_t rate = 0;
-
-	switch (pll->type) {
-	case pll_rk3036:
-		pll->mode_mask = PLL_MODE_MASK;
-		rate = rk3036_pll_get_rate(pll, base, pll_id);
-		break;
-	case pll_rk3328:
-		pll->mode_mask = PLL_RK3328_MODE_MASK;
-		rate = rk3036_pll_get_rate(pll, base, pll_id);
-		break;
-	case pll_rk3588:
-		pll->mode_mask = PLL_MODE_MASK;
-		rate = rk3588_pll_get_rate(pll, base, pll_id);
-		break;
-	default:
-		LOG_D("%s: Unknown pll type for pll clk %ld\n",
-		       __func__, pll_id);
-	}
-	return rate;
-}
-
-int rk_pll_set_rate(struct rk_pll_clock *pll,
-			  void *base, rt_ubase_t pll_id,
-			  rt_ubase_t drate)
-{
-	int ret = 0;
-
-	if (rk_pll_get_rate(pll, base, pll_id) == drate)
-		return 0;
-
-	switch (pll->type) {
-	case pll_rk3036:
-		pll->mode_mask = PLL_MODE_MASK;
-		ret = rk3036_pll_set_rate(pll, base, pll_id, drate);
-		break;
-	case pll_rk3328:
-		pll->mode_mask = PLL_RK3328_MODE_MASK;
-		ret = rk3036_pll_set_rate(pll, base, pll_id, drate);
-		break;
-	case pll_rk3588:
-		pll->mode_mask = PLL_MODE_MASK;
-		ret = rk3588_pll_set_rate(pll, base, pll_id, drate);
-		break;
-	default:
-		LOG_D("%s: Unknown pll type for pll clk %ld\n",
-		       __func__, pll_id);
-	}
-	return ret;
-}
-
-const struct rk_cpu_rate_table *rk_get_cpu_settings(struct rk_cpu_rate_table *cpu_table, rt_ubase_t rate)
+static const struct rk_cpu_rate_table *rk_get_cpu_settings(struct rk_cpu_rate_table *cpu_table, rt_ubase_t rate)
 {
     struct rk_cpu_rate_table *ps = cpu_table;
 
@@ -598,7 +347,8 @@ const struct rk_cpu_rate_table *rk_get_cpu_settings(struct rk_cpu_rate_table *cp
         return ps;
     }
 }
-rt_base_t rk_clk_pll_round_rate(const struct rk_pll_rate_table *pll_rates,
+
+static rt_base_t rk_clk_pll_round_rate(const struct rk_pll_rate_table *pll_rates,
         rt_size_t rate_count, rt_ubase_t drate, rt_ubase_t *prate)
 {
     int i;
@@ -615,7 +365,8 @@ rt_base_t rk_clk_pll_round_rate(const struct rk_pll_rate_table *pll_rates,
     /* return minimum supported value */
     return pll_rates[i - 1].rate;
 }
-void rk_clk_set_default_rates(struct rt_clk *clk,
+
+static void rk_clk_set_default_rates(struct rt_clk *clk,
         rt_err_t (*clk_set_rate)(struct rt_clk *, rt_ubase_t, rt_ubase_t), int id)
 {
     rt_uint32_t rate;

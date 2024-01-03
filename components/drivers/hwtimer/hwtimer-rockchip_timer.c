@@ -12,7 +12,7 @@
 #include <rtthread.h>
 #include <rtdevice.h>
 
-#include "../clk/rockchip/clk-rk.h"
+#include "../clk/rockchip/clk.h"
 
 #define TIMER_LOAD_COUNT0       0x00
 #define TIMER_LOAD_COUNT1       0x04

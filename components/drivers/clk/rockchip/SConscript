@@ -2,7 +2,7 @@ from building import *
 
 group = []
 
-if not GetDepend(['RT_CLK_ROCKCHIP']) and not GetDepend(['RT_CLK_ROCKCHIP_RK8XX_CLKOUT']) :
+if not GetDepend(['RT_CLK_ROCKCHIP']) and not GetDepend(['RT_CLK_ROCKCHIP_RK8XX_CLKOUT']):
     Return('group')
 
 cwd = GetCurrentDir()
@@ -18,9 +18,6 @@ if GetDepend(['RT_CLK_ROCKCHIP_RK3308']):
 
 if GetDepend(['RT_CLK_ROCKCHIP_RK3568']):
     src += ['clk-rk3568.c']
-
-if GetDepend(['RT_CLK_ROCKCHIP_RK3588']):
-    src += ['clk-rk3588.c']
 
 group = DefineGroup('DeviceDrivers', src, depend = [''], CPPPATH = CPPPATH)
 

@@ -80,7 +80,7 @@ int dfs_mnt_insert(struct dfs_mnt* mnt, struct dfs_mnt* child)
                     mnt->parent = dfs_mnt_ref(mnt);
                     mnt->flags |= MNT_IS_ADDLIST;
 
-                    mkdir("/dev", 0777);
+                    //mkdir("/dev", 0777);
                 }
                 else
                 {

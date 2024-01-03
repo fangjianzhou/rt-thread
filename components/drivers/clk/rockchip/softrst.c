@@ -8,7 +8,6 @@
  * 2022-11-26     GuEe-GUI     first version
  */
 
-#include "clk-rk.h"
 struct rockchip_softrst
 {
     void *regs;
@@ -80,7 +79,7 @@ static const struct rt_reset_control_ops rockchip_softrst_ops =
     .deassert   = rockchip_softrst_deassert,
 };
 
-rt_err_t rk_register_softrst(struct rt_reset_controller *rstcer,
+static rt_err_t rk_register_softrst(struct rt_reset_controller *rstcer,
         struct rt_ofw_node *np, void *regs, rt_uint8_t flags)
 {
     rt_err_t err;
@@ -105,9 +104,7 @@ rt_err_t rk_register_softrst(struct rt_reset_controller *rstcer,
     if ((err = rt_reset_controller_register(rstcer)))
     {
         rt_free(softrst);
-
-        return err;
     }
 
-    return RT_EOK;
+    return err;
 }

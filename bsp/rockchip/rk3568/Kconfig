@@ -27,5 +27,3 @@ config SOC_RK3568
     select RT_USING_USER_MAIN
     select ARCH_ARM_BOOTWITH_FLUSH_CACHE
     default y
-
-source "$BSP_DIR/driver/Kconfig"

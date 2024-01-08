@@ -295,6 +295,12 @@ static int dwcmshc_rk35xx_init(struct sdhci_host *host, struct dwcmshc_priv *dwc
 
 static void dwcmshc_rk35xx_postinit(struct sdhci_host *host, struct dwcmshc_priv *dwc_priv)
 {
+    if (host->mmc->f_max <= 52000000) {
+        rt_kprintf("Disabling HS200/HS400, frequency too low (%d)\n", host->mmc->f_max);
+        host->mmc->caps2 &= ~(MMC_CAP2_HS200 | MMC_CAP2_HS400);
+        host->mmc->caps &= ~(MMC_CAP_3_3V_DDR | MMC_CAP_1_8V_DDR);
+    }
+    
     return;
 }
 

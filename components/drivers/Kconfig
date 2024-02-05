@@ -972,6 +972,8 @@ source "$RTT_DIR/components/drivers/ofw/Kconfig"
 source "$RTT_DIR/components/drivers/pic/Kconfig"
 source "$RTT_DIR/components/drivers/ktime/Kconfig"
 source "$RTT_DIR/components/drivers/clk/Kconfig"
+source "$RTT_DIR/components/drivers/pin/Kconfig"
+source "$RTT_DIR/components/drivers/pinctrl/Kconfig"
 
 menu "Using USB"
     config RT_USING_USB

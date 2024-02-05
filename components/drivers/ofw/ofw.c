@@ -175,7 +175,6 @@ rt_err_t rt_ofw_console_setup(void)
     /* chosen.console > chosen.stdout-path > RT_CONSOLE_DEVICE_NAME */
 
     con = rt_ofw_bootargs_select("console=", 0);
-
     for (int i = 1; con; ++i)
     {
         if (!rt_strncmp(con, "uart", sizeof("uart") - 1))
@@ -228,7 +227,6 @@ rt_err_t rt_ofw_console_setup(void)
         if (serial)
         {
             ofw_name = rt_ofw_node_full_name(serial->ofw_node);
-
             con = RT_CONSOLE_DEVICE_NAME;
         }
         else
@@ -258,7 +256,6 @@ rt_err_t rt_ofw_console_setup(void)
     rt_fdt_earlycon_kick(FDT_EARLYCON_KICK_COMPLETED);
 
     LOG_I("Console: %s (%s)", con, ofw_name ? ofw_name : "<unknown>");
-
     return err;
 }
 
@@ -298,6 +295,10 @@ const char *rt_ofw_bootargs_select(const char *key, int index)
                 while (*ch == ' ' && ch < bootargs_end)
                 {
                     *(char *)ch++ = '\0';
+                }
+                if (*ch == '\0')
+                {
+                    --bootargs_nr;
                 }
                 --ch;
             }

@@ -20,6 +20,7 @@
 #include <rtdbg.h>
 
 #include "ofw_internal.h"
+#include "../serial/serial_dm.h"
 
 struct rt_fdt_earlycon fdt_earlycon rt_section(".bss.noclean.earlycon");
 

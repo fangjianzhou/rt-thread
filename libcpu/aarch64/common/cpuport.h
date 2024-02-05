@@ -66,6 +66,12 @@ rt_inline int __rt_ffs(int value)
 #endif
 }
 
+#define rt_hw_sysreg_write(sysreg, val) \
+    __asm__ volatile ("msr "RT_STRINGIFY(sysreg)", %0"::"r"((rt_uint64_t)(val)))
+
+#define rt_hw_sysreg_read(sysreg, val) \
+    __asm__ volatile ("mrs %0, "RT_STRINGIFY(sysreg)"":"=r"((val)))
+
 #endif /* RT_USING_CPU_FFS */
 
 #endif  /*CPUPORT_H__*/

@@ -240,6 +240,7 @@ void rt_hw_common_setup(void)
     void *kernel_start, *kernel_end, *memheap_start = RT_NULL, *memheap_end = RT_NULL;
 
     system_vectors_init();
+    
 #ifdef RT_USING_SMART
     rt_hw_mmu_map_init(&rt_kernel_space, (void*)0xfffffffff0000000, 0x10000000, MMUTable, PV_OFFSET);
 #else

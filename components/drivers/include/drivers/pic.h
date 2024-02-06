@@ -111,7 +111,7 @@ struct rt_pic_irq
     struct rt_pic_irq *parent;
 };
 
-rt_err_t rt_pic_linear_irq(struct rt_pic *pic, rt_size_t irq_nr);
+void rt_pic_default_name(struct rt_pic *pic);
 struct rt_pic *rt_pic_dynamic_cast(void *ptr);
 
 rt_err_t rt_pic_linear_irq(struct rt_pic *pic, rt_size_t irq_nr);

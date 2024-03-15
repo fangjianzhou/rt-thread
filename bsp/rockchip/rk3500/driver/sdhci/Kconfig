@@ -1,0 +1,4 @@
+config RT_SDIO_SDHCI_DWCMSHC
+    bool "Synopsys DWC MSHC SDHCI"
+    select RT_USING_OFW
+    default n

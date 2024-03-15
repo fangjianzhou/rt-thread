@@ -1,0 +1,13 @@
+menuconfig RT_USING_NET
+    bool "Using net device drivers"
+    default y
+
+config RT_USING_DWC_EQOS
+    bool "Using builtin fdt in kernel"
+    depends on RT_USING_NET
+    default y
+
+config RT_USING_DWC_EQOS_ROCKCHIP
+    bool "Builtin fdt path, will rebuild if have dts"
+    depends on RT_USING_DWC_EQOS
+    default y

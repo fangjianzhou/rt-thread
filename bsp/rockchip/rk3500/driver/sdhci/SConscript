@@ -1,0 +1,20 @@
+# RT-Thread building script for component
+
+from building import *
+
+cwd     = GetCurrentDir()
+src     = []
+CPPPATH = [cwd, cwd + '/port']
+
+src = []
+
+if GetDepend(['RT_SDIO_SDHCI_DWCMSHC']):
+    src += Glob('*.c')
+    src += Glob('port/*.c')
+    src += Glob('platform/rk/*.c')
+
+group = DefineGroup('Drivers', src, depend = [], CPPPATH = CPPPATH)
+
+objs = [group]
+
+Return('objs')
